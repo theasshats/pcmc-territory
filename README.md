@@ -14,6 +14,34 @@ This mod **reads** MineColonies colony borders and Open Parties and Claims chunk
 claims to determine territory ownership. It **owns and creates zero claims of its
 own** — it never calls into either mod's claim-creation APIs.
 
+## Looking ahead (Part 2+)
+
+Part 1 deliberately stops at "read MineColonies/OPAC, resolve a chunk to an entity."
+A few directions discussed for Part 2 (`pcmc-realms`) and beyond are recorded here so
+they aren't lost before that work is scoped:
+
+- **Combined city/faction borders.** The data model already supports this: a
+  `RealmEntity` can hold both `colonyIds` and bound `claimKeys`, and
+  `TerritoryResolver.resolveLeaf` falls through colony → claim for the same
+  registry. So a city's MineColonies border plus any OPAC claims its members bind
+  to it already resolve as one combined territory today — Part 1 is missing only a
+  player-facing bind command (`/realm debug bindclaim` is the op-only stand-in for
+  exercising that path).
+- **Tier-gated claim allowances.** Citizens start with a small OPAC claim allowance;
+  MineColonies city-tier growth raises it; confederation/faction leaders hold a
+  larger pool they can grant to members as "charters" (e.g. to start an outpost or
+  mine). This is a Part 2 governance feature, not Part 1 scope.
+- **Hard-limiting claims by government.** A stronger version of the above, where the
+  government can *prevent* an over-allowance OPAC claim outright rather than just
+  decline to count it as territory. This needs OPAC to expose either a settable
+  per-player claim limit or a cancellable claim-creation event — **both unverified**
+  (see `docs/SPIKE-PART1.md` §3). Until one of those is confirmed against the real
+  jar, the fallback is enforcing the allowance at the *binding* layer: an
+  over-allowance claim can still exist in OPAC, it just doesn't bind to (and thus
+  doesn't expand) a realm's territory. OPAC stays a **soft dependency** for Part 1
+  either way; making it hard would only be worth revisiting if the hard-limit
+  approach pans out.
+
 ## Modules
 
 - **`:core`** — pure Java, no Minecraft/NeoForge/MineColonies/OPAC dependencies.

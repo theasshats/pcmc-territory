@@ -78,6 +78,12 @@ If the package/method names differ, `OpacClaimLookup` is the one file to fix;
 **Also unverified**: OPAC's claim-change event/listener API. Part 1 does not depend on
 it; see §4.
 
+**For a future Part 2 spike**: whether OPAC exposes (a) a settable per-player claim
+limit, or (b) a cancellable claim-creation event. Either would let a future
+"government-issued claim allowance" feature (README's "Looking ahead" section)
+*prevent* an over-allowance claim outright instead of just declining to bind it to a
+realm. Part 1 does not depend on either.
+
 ## 4. Cache invalidation design — TTL instead of an unverifiable event hook
 
 Spec §6 calls for the chunk→entity resolver to be "event-driven and position-local."
