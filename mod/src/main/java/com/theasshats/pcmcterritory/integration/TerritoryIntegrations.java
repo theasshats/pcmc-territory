@@ -17,10 +17,10 @@ import net.neoforged.fml.ModList;
  */
 public final class TerritoryIntegrations {
 
-    /** MineColonies' mod id (verify against the 1.1.1327-1.21.1 jar — spec spike item (a)). */
+    /** MineColonies' mod id — matches the 1.1.1327-1.21.1 jar's mods.toml (spike item (a), verified via the pack repo's mod-data digest). */
     public static final String MINECOLONIES_MOD_ID = "minecolonies";
 
-    /** Open Parties and Claims' mod id (verify against the 0.26.2 neoforge jar — spec spike item (b)). */
+    /** Open Parties and Claims' mod id — matches the neoforge-1.21.1-0.26.2 jar's mods.toml (spike item (b), verified via the pack repo's mod-data digest). */
     public static final String OPAC_MOD_ID = "openpartiesandclaims";
 
     private TerritoryIntegrations() {}
