@@ -5,9 +5,9 @@ import com.theasshats.pcmcterritory.core.ClaimLookup;
 import com.theasshats.pcmcterritory.core.TerritoryChunk;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import xaero.pac.common.server.claims.api.IPlayerChunkClaimAPI;
+import xaero.pac.common.claims.player.api.IPlayerChunkClaimAPI;
+import xaero.pac.common.server.api.OpenPACServerAPI;
 import xaero.pac.common.server.claims.api.IServerClaimsManagerAPI;
-import xaero.pac.common.server.claims.api.OpenPACServerAPI;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -15,13 +15,13 @@ import java.util.UUID;
 /**
  * Position -&gt; OPAC claim owner (spec §6).
  *
- * <p><b>SPIKE — unverified against the real jar (see docs/SPIKE-PART1.md):</b> this
- * sandbox cannot resolve {@code maven.modrinth:open-parties-and-claims:b16WHzyv}
- * (Modrinth maven is network-blocked here), so the {@code xaero.pac.common.server.claims.api}
- * package/types below are based on the published javadoc surface
- * (thexaero.github.io/open-parties-and-claims) but have not been compiled against the
- * actual jar. If the package/method names differ, this is the one file to fix;
- * {@link ClaimLookup} callers are unaffected.
+ * <p><b>Compile-verified, not yet runtime-verified (see docs/SPIKE-PART1.md §3):</b>
+ * the spike's guessed package names failed the first real CI compile; the imports
+ * below were then corrected against the OPAC 1.21 branch source
+ * (github.com/thexaero/open-parties-and-claims) and CI compiles this class against
+ * the real {@code neoforge-1.21.1-0.26.2} jar. In-game behavior still needs the
+ * docs/PLAYTESTING.md pass. If a future OPAC version moves these types, this is the
+ * one file to fix; {@link ClaimLookup} callers are unaffected.
  *
  * <p>{@link IPlayerChunkClaimAPI#getPlayerId()} returns the claim's "owner" — a real
  * player UUID for a personal claim, or a party's fake-player UUID for a party claim.
@@ -38,7 +38,7 @@ public final class OpacClaimLookup implements ClaimLookup {
 
     @Override
     public Optional<ClaimKey> claimAt(TerritoryChunk chunk) {
-        IServerClaimsManagerAPI<?, ?, ?> claimsManager = OpenPACServerAPI.get(server).getServerClaimsManager();
+        IServerClaimsManagerAPI claimsManager = OpenPACServerAPI.get(server).getServerClaimsManager();
 
         int chunkX = TerritoryChunk.unpackX(chunk.packedChunkPos());
         int chunkZ = TerritoryChunk.unpackZ(chunk.packedChunkPos());
@@ -49,7 +49,9 @@ public final class OpacClaimLookup implements ClaimLookup {
         }
         UUID ownerId = claim.getPlayerId();
         if (ownerId == null) {
-            // Server/admin-reserved claims may have no owning player or party.
+            // The 1.21 API documents getPlayerId() as not-null — even server claims
+            // carry a dedicated owner (PlayerConfig.SERVER_CLAIM_UUID). Kept as a
+            // zero-cost guard against a future version regressing that contract.
             return Optional.empty();
         }
         return Optional.of(new ClaimKey(ownerId));

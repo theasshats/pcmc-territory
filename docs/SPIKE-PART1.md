@@ -32,7 +32,7 @@ maintainer box with full internet).
 have **not** been run successfully here — `.github/workflows/build.yml` runs them with
 full CI network access, and that result is the first real compile signal.
 
-## 2. MineColonies API (unverified)
+## 2. MineColonies API (compile-verified)
 
 `mod/src/main/java/com/theasshats/pcmcterritory/integration/minecolonies/MineColoniesColonyLookup.java`
 calls:
@@ -42,9 +42,11 @@ IMinecoloniesAPI.getInstance().getColonyManager().getColonyByPosFromWorld(level,
 ```
 
 returning an `IColony` whose `getID()` is the colony id bound via `/realm found`. This
-is the documented 1.21.1 `IColonyManager` entry point, but it has **not** been compiled
+is the documented 1.21.1 `IColonyManager` entry point, and CI now compiles it clean
 against the real `minecolonies-1.1.1327-1.21.1-snapshot` jar (CurseForge project
-245506, file 8186694) — the jar could not be downloaded here.
+245506, file 8186694) — the spike's guess survived contact. Runtime behavior (does
+standing in a colony actually resolve its id?) still needs the docs/PLAYTESTING.md
+pass.
 
 If the method/package name differs on the real jar, `MineColoniesColonyLookup` is the
 **only** file that needs to change — `ColonyLookup` (the `:core` interface) and every
@@ -55,7 +57,7 @@ for cache invalidation, and whether a per-chunk capability exposes the owning co
 directly (an O(1) alternative to the position lookup above — flagged in the file as a
 perf upgrade to check once this compiles). Part 1 does not depend on either; see §4.
 
-## 3. Open Parties and Claims API (unverified)
+## 3. Open Parties and Claims API (compile-verified)
 
 `mod/src/main/java/com/theasshats/pcmcterritory/integration/opac/OpacClaimLookup.java`
 calls:
@@ -66,23 +68,36 @@ OpenPACServerAPI.get(server).getServerClaimsManager()
 ```
 
 returning an `IPlayerChunkClaimAPI` whose `getPlayerId()` becomes the `ClaimKey` an
-entity binds. This matches the published javadoc surface
-(thexaero.github.io/open-parties-and-claims) for
-`xaero.pac.common.server.claims.api`, but — same caveat — has **not** been compiled
-against the real `open-parties-and-claims-neoforge-1.21.1-0.26.2` jar (Modrinth
-`gF3BGWvG`), which could not be downloaded here.
+entity binds.
 
-**Resolved by the first CI run (lesson):** the spike originally wrote the Modrinth
-coordinate as `0.26.2-neoforge`, guessing a `<version>-<loader>` suffix format. CI
-*could* reach Modrinth maven and got a clean "not found" — OPAC's actual version
-numbers embed loader and MC version as a *prefix* (`neoforge-1.21.1-0.26.2`, matching
-the jar filename). The dependency is now pinned by Modrinth version *id*
-(`b16WHzyv`, from the pack repo's `mods/open-parties-and-claims.pw.toml`), which is
-immutable and can't be mis-formatted. When adding a Modrinth dep without API access,
-take the version id straight from a packwiz manifest or the version page URL.
+**Maven coordinate (lesson):** the spike originally wrote the Modrinth coordinate as
+`0.26.2-neoforge`, guessing a `<version>-<loader>` suffix format. CI *could* reach
+Modrinth maven and got a clean "not found" — OPAC's actual version numbers embed
+loader and MC version as a *prefix* (`neoforge-1.21.1-0.26.2`, matching the jar
+filename). The dependency is now pinned by Modrinth version *id* (`b16WHzyv`, from
+the pack repo's `mods/open-parties-and-claims.pw.toml`), which is immutable and
+can't be mis-formatted. When adding a Modrinth dep without API access, take the
+version id straight from a packwiz manifest or the version page URL.
 
-If the package/method names differ, `OpacClaimLookup` is the one file to fix;
-`ClaimLookup` and its callers are unaffected.
+**API surface (lesson):** the spike's guessed packages were wrong, and the first real
+CI compile against the `neoforge-1.21.1-0.26.2` jar caught all of it — exactly the
+"one file to fix" failure mode this layout was designed for. The corrected surface,
+cross-checked against the OPAC `1.21` branch source
+(github.com/thexaero/open-parties-and-claims, `minecraft_version=1.21.1`):
+
+- `OpenPACServerAPI` lives in `xaero.pac.common.server.api` (not `server.claims.api`);
+  static `get(MinecraftServer)`.
+- `IPlayerChunkClaimAPI` lives in `xaero.pac.common.claims.player.api`; its
+  `getPlayerId()` is documented **not-null** — server claims carry a dedicated owner
+  UUID (`PlayerConfig.SERVER_CLAIM_UUID`) rather than a null owner.
+- `IServerClaimsManagerAPI` (in `xaero.pac.common.server.claims.api`, as guessed) is
+  **generic-free** on 1.21 — the old `<?, ?, ?>` wildcard form doesn't compile.
+- `get(ResourceLocation dimension, int x, int z)` takes **chunk** coordinates (a
+  `ChunkPos` overload exists alongside it).
+
+If a future OPAC version moves these types, `OpacClaimLookup` is the one file to fix;
+`ClaimLookup` and its callers are unaffected. Runtime behavior (does a claimed chunk
+actually resolve?) still needs the docs/PLAYTESTING.md pass.
 
 **Also unverified**: OPAC's claim-change event/listener API. Part 1 does not depend on
 it; see §4.
