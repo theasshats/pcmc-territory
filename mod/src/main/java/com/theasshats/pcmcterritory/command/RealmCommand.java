@@ -61,7 +61,7 @@ public final class RealmCommand {
 
         ServerLevel level = source.getLevel();
         RealmsSavedData data = data(level);
-        TerritoryChunk chunk = chunkAt(level, player);
+        TerritoryChunk chunk = chunkAt(player);
 
         OptionalInt colonyId = data.resolver().colonyLookup().colonyIdAt(chunk);
         if (colonyId.isEmpty()) {
@@ -125,7 +125,7 @@ public final class RealmCommand {
             entity = byName.get();
         } else {
             ServerPlayer player = source.getPlayerOrException();
-            TerritoryChunk chunk = chunkAt(level, player);
+            TerritoryChunk chunk = chunkAt(player);
             Optional<EntitySnapshot> here = data.resolver().resolveLeaf(chunk)
                     .flatMap(data.registry()::get)
                     .map(EntitySnapshot::of);
@@ -168,7 +168,7 @@ public final class RealmCommand {
         ServerPlayer player = source.getPlayerOrException();
         ServerLevel level = source.getLevel();
         RealmsSavedData data = data(level);
-        TerritoryChunk chunk = chunkAt(level, player);
+        TerritoryChunk chunk = chunkAt(player);
 
         Optional<UUID> leaf = data.resolver().resolveLeaf(chunk);
         if (leaf.isEmpty()) {
@@ -199,7 +199,7 @@ public final class RealmCommand {
 
         ServerLevel level = source.getLevel();
         RealmsSavedData data = data(level);
-        TerritoryChunk chunk = chunkAt(level, player);
+        TerritoryChunk chunk = chunkAt(player);
 
         Optional<ClaimKey> claim = data.resolver().claimLookup().claimAt(chunk);
         if (claim.isEmpty()) {
@@ -240,9 +240,14 @@ public final class RealmCommand {
         return RealmsSavedData.get(level.getServer().overworld());
     }
 
-    /** Resolves the territory chunk {@code player} currently stands in. */
-    private static TerritoryChunk chunkAt(ServerLevel level, ServerPlayer player) {
-        return TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+    /**
+     * Resolves the territory chunk {@code player} currently stands in. Derives the
+     * dimension from the player, not {@code source.getLevel()} — under
+     * {@code /execute in <dim> run realm …} the source level can differ from the
+     * level the player (and their position) is actually in.
+     */
+    private static TerritoryChunk chunkAt(ServerPlayer player) {
+        return TerritoryApi.toTerritoryChunk(player.serverLevel(), new ChunkPos(player.blockPosition()));
     }
 
     /** Looks up an entity's display name, falling back to {@code "?"} if it no longer exists. */

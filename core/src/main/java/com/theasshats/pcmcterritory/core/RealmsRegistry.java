@@ -43,27 +43,41 @@ public final class RealmsRegistry {
     /**
      * Reconstructs an entity (and its reverse indexes) from persisted state without
      * firing listeners — used by {@code RealmsSavedData} on world load. Throws
-     * {@link RealmConflictException} if {@code colonyIds}/{@code claimKeys} collide
-     * with an already-loaded entity (should not happen for well-formed save data).
+     * {@link RealmConflictException} if {@code id} duplicates or
+     * {@code colonyIds}/{@code claimKeys} collide with an already-loaded entity
+     * (should not happen for well-formed save data). All-or-nothing: the load path
+     * survives a corrupt entity by skipping it, so a failed restore must not leave
+     * index entries pointing at an entity that never made it into the registry —
+     * everything is validated before anything is committed.
      */
     public RealmEntity restoreEntity(UUID id, String name, long createdTick,
                                       Map<UUID, Role> members, Set<Integer> colonyIds, Set<ClaimKey> claimKeys) {
-        RealmEntity entity = new RealmEntity(id, name, createdTick);
-        members.forEach(entity::putMember);
+        if (entities.containsKey(id)) {
+            throw new RealmConflictException("Duplicate entity id " + id);
+        }
         for (int colonyId : colonyIds) {
-            UUID existing = colonyIndex.putIfAbsent(colonyId, id);
+            UUID existing = colonyIndex.get(colonyId);
             if (existing != null && !existing.equals(id)) {
                 throw new RealmConflictException(
                         "Colony " + colonyId + " is bound to both " + existing + " and " + id);
             }
-            entity.addColonyId(colonyId);
         }
         for (ClaimKey claimKey : claimKeys) {
-            UUID existing = claimIndex.putIfAbsent(claimKey, id);
+            UUID existing = claimIndex.get(claimKey);
             if (existing != null && !existing.equals(id)) {
                 throw new RealmConflictException(
                         "Claim " + claimKey + " is bound to both " + existing + " and " + id);
             }
+        }
+
+        RealmEntity entity = new RealmEntity(id, name, createdTick);
+        members.forEach(entity::putMember);
+        for (int colonyId : colonyIds) {
+            colonyIndex.put(colonyId, id);
+            entity.addColonyId(colonyId);
+        }
+        for (ClaimKey claimKey : claimKeys) {
+            claimIndex.put(claimKey, id);
             entity.addClaimKey(claimKey);
         }
         entities.put(id, entity);

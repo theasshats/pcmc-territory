@@ -2,6 +2,8 @@ package com.theasshats.pcmcterritory.core;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -116,6 +118,40 @@ class RealmsRegistryTest {
 
         assertThrows(RealmConflictException.class,
                 () -> registry.restoreEntity(UUID.randomUUID(), "B", 0L, Map.of(), Set.of(7), Set.of()));
+    }
+
+    @Test
+    void restoreEntityConflictLeavesNoPartialState() {
+        RealmsRegistry registry = new RealmsRegistry();
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        ClaimKey claimKey = new ClaimKey(UUID.randomUUID());
+        registry.restoreEntity(a, "A", 0L, Map.of(), Set.of(5), Set.of());
+
+        // 6 is processed before the conflicting 5 (LinkedHashSet keeps that order);
+        // the failed restore must not leave 6 or the claim bound to the skipped b.
+        assertThrows(RealmConflictException.class, () -> registry.restoreEntity(
+                b, "B", 0L, Map.of(), new LinkedHashSet<>(List.of(6, 5)), Set.of(claimKey)));
+
+        assertTrue(registry.get(b).isEmpty());
+        assertTrue(registry.entityIdForColony(6).isEmpty());
+        assertTrue(registry.entityIdForClaim(claimKey).isEmpty());
+        assertEquals(a, registry.entityIdForColony(5).orElseThrow());
+    }
+
+    @Test
+    void restoreEntityDuplicateIdThrows() {
+        RealmsRegistry registry = new RealmsRegistry();
+        UUID id = UUID.randomUUID();
+        registry.restoreEntity(id, "A", 0L, Map.of(), Set.of(5), Set.of());
+
+        assertThrows(RealmConflictException.class,
+                () -> registry.restoreEntity(id, "A again", 0L, Map.of(), Set.of(6), Set.of()));
+
+        // The first restore stays intact and the duplicate's bindings don't land.
+        assertEquals("A", registry.get(id).orElseThrow().name());
+        assertEquals(id, registry.entityIdForColony(5).orElseThrow());
+        assertTrue(registry.entityIdForColony(6).isEmpty());
     }
 
     @Test
