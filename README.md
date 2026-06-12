@@ -1,0 +1,92 @@
+# PCMC Territory
+
+The territory substrate for Project Commonwealth's governance system (spec §6, Part
+1 of the [governance mod plan](https://github.com/theasshats/project-commonwealth)).
+Given a `(level, chunkPos)`, resolves which political entity — if any — governs that
+chunk.
+
+**Scope fence (Part 1 only)**: no tiers, laws, federation, treasury, or Numismatics
+dependency. Just the chunk → entity resolver, a minimal entity registry, and three
+debug commands. Part 2 (`pcmc-realms`) builds government on top of this via the
+public `api` package.
+
+This mod **reads** MineColonies colony borders and Open Parties and Claims chunk
+claims to determine territory ownership. It **owns and creates zero claims of its
+own** — it never calls into either mod's claim-creation APIs.
+
+## Modules
+
+- **`:core`** — pure Java, no Minecraft/NeoForge/MineColonies/OPAC dependencies.
+  The entity model (`RealmEntity`, `RealmsRegistry`), the chunk→entity resolver
+  (`TerritoryResolver`), and the `ColonyLookup`/`ClaimLookup` interfaces the mod
+  module implements. Fully unit-tested with JUnit 5 — `./gradlew :core:test`.
+- **`:mod`** — the NeoForge 1.21.1 mod. SavedData persistence, Brigadier commands,
+  the public `api` package, NeoForge events, and the MineColonies/OPAC adapters.
+  Requires NeoForge/CurseMaven/Modrinth Maven access to build (CI only — see
+  `docs/SPIKE-PART1.md`).
+
+## Soft dependencies
+
+| Mod | Version | Mod ID | If absent |
+| --- | --- | --- | --- |
+| MineColonies | 1.1.1327-1.21.1-snapshot | `minecolonies` | Colony resolution no-ops (`ColonyLookup.NOOP`); `/realm found` reports MineColonies as absent. |
+| Open Parties and Claims | 0.26.2-neoforge | `openpartiesandclaims` | Claim resolution no-ops (`ClaimLookup.NOOP`). |
+
+Either or both can be missing without the mod crashing — territory resolution simply
+degrades to "no colonies/claims known," and chunks resolve as ungoverned.
+
+## Commands
+
+- `/realm found <name>` — binds the colony at your current position to a political
+  entity named `<name>` (creating it if it doesn't exist). Requires MineColonies and
+  standing inside a colony's claim. Requires OFFICER+ to rebind an existing entity.
+- `/realm info [name]` — shows an entity's id, members, bound colony ids, and bound
+  claim keys. Defaults to the entity governing your current chunk.
+- `/realm whogoverns` — debug command reporting which entity (if any) governs your
+  current chunk.
+
+## Building
+
+```sh
+./gradlew build       # builds :core and :mod
+./gradlew :core:test  # runs the :core unit tests (no Minecraft toolchain needed)
+```
+
+`:mod` requires resolving NeoForge, MineColonies (CurseMaven), and Open Parties and
+Claims (Modrinth Maven) — see `docs/SPIKE-PART1.md` for why that can't happen in this
+sandbox and what's been verified vs. assumed.
+
+## Releases
+
+`.github/workflows/build.yml` builds the mod jar on every push/PR. On a `v*` tag, it
+additionally prints the jar's sha1 and attaches it to a GitHub release — the
+mod-mirror pattern described in `project-commonwealth`'s `docs/CUSTOM-MODS.md`.
+
+## Maintainer playtest checklist
+
+CI green (`./gradlew build` succeeding) means `:mod` **compiles** against the real
+MineColonies/OPAC jars. It does **not** mean any of the following have been verified —
+this sandbox cannot launch Minecraft, so all of the below needs a real client/server:
+
+- [ ] Client boots to the main menu with this mod + MineColonies + OPAC installed.
+- [ ] `/realm found <name>` while standing inside a MineColonies colony successfully
+      binds that colony to a new (or existing, with OFFICER+) entity.
+- [ ] `/realm whogoverns` reports the correct entity name while standing inside that
+      colony's claimed chunks.
+- [ ] `/realm whogoverns` reports the correct entity while standing inside an Open
+      Parties and Claims claim bound via the registry (no MineColonies colony there).
+- [ ] `/realm whogoverns` reports "ungoverned" in wilderness (no colony, no claim).
+- [ ] `/realm info [name]` prints sensible header/members/colonies/claims for a bound
+      entity.
+- [ ] No measurable TPS impact from repeated `/realm whogoverns` calls or normal block
+      break / combat in governed and ungoverned chunks (spark profile before/after).
+- [ ] Removing MineColonies (keeping OPAC) — server starts without crashing, colony
+      resolution degrades to "none," `/realm found` reports MineColonies absent.
+- [ ] Removing Open Parties and Claims (keeping MineColonies) — server starts without
+      crashing, claim-only territory resolves as ungoverned.
+- [ ] Removing both — server starts without crashing; all chunks resolve as
+      ungoverned; `/realm found` reports MineColonies absent.
+
+**Green CI is not in-game verification.** Until the checklist above is run on a real
+server with the real dependency jars, treat `MineColoniesColonyLookup` and
+`OpacClaimLookup`'s API calls (see `docs/SPIKE-PART1.md` §2–3) as unverified.

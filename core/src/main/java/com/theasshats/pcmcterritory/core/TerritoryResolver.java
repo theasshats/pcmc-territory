@@ -6,32 +6,60 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.LongSupplier;
 
 /**
  * The chunk -&gt; entity resolver (spec §6), the hot path everything above Part 1
- * eventually calls. Backed by a cache that is invalidated whenever the registry
- * changes (entity created/removed/edited) — entity edits are rare admin actions,
- * so a full-cache clear on those is cheap and keeps invalidation simple and correct.
- * Per-chunk invalidation ({@link #invalidate}) is used for claim-change signals,
- * which can be position-targeted.
+ * eventually calls.
  *
- * <p>{@link #resolveLeaf} also caches negative results (no governing entity —
- * "wilderness") so repeated lookups over ungoverned land don't repeatedly call
- * into MineColonies/OPAC.
+ * <p><b>Invalidation strategy.</b> Two independent triggers:
+ * <ul>
+ *   <li><b>Registry edits</b> (entity created/removed/changed) invalidate the whole
+ *       cache immediately via {@link RegistryListener} — these are rare admin
+ *       actions, so a full clear is cheap and exact.</li>
+ *   <li><b>External claim changes</b> (MineColonies colony borders, OPAC claims)
+ *       use a short per-entry TTL ({@link #ttlTicks}) instead of a change-event
+ *       hook: a cache entry older than the TTL is treated as a miss and
+ *       recomputed on the next lookup. This is still position-local and
+ *       event-driven in the sense that matters for perf — the check happens only
+ *       when a position is already being queried, never a background scan — and
+ *       it works regardless of exactly how/whether MineColonies or OPAC signal a
+ *       claim change, which spec §6 spike couldn't fully pin down without the
+ *       real jars (see docs/SPIKE-PART1.md). Default TTL is {@link #DEFAULT_TTL_TICKS}
+ *       (1 second) — short enough that a moved claim border is reflected almost
+ *       immediately, long enough that hot-path lookups (combat, block break) stay
+ *       cache-served.</li>
+ * </ul>
+ *
+ * <p>Negative results ("wilderness") are cached too, subject to the same TTL, so
+ * repeated lookups over ungoverned land don't repeatedly call into MineColonies/OPAC.
  */
 public final class TerritoryResolver implements RegistryListener {
 
+    public static final long DEFAULT_TTL_TICKS = 20L; // ~1 second at 20 TPS
+
     private static final UUID UNGOVERNED = new UUID(0L, 0L);
+
+    private record CacheEntry(UUID entityOrSentinel, long cachedAtTick) {}
 
     private final RealmsRegistry registry;
     private volatile ColonyLookup colonyLookup;
     private volatile ClaimLookup claimLookup;
-    private final ConcurrentMap<TerritoryChunk, UUID> cache = new ConcurrentHashMap<>();
+    private final LongSupplier currentTick;
+    private final long ttlTicks;
+    private final ConcurrentMap<TerritoryChunk, CacheEntry> cache = new ConcurrentHashMap<>();
 
     public TerritoryResolver(RealmsRegistry registry, ColonyLookup colonyLookup, ClaimLookup claimLookup) {
+        this(registry, colonyLookup, claimLookup, () -> 0L, DEFAULT_TTL_TICKS);
+    }
+
+    public TerritoryResolver(RealmsRegistry registry, ColonyLookup colonyLookup, ClaimLookup claimLookup,
+                              LongSupplier currentTick, long ttlTicks) {
         this.registry = registry;
         this.colonyLookup = colonyLookup;
         this.claimLookup = claimLookup;
+        this.currentTick = currentTick;
+        this.ttlTicks = ttlTicks;
         registry.addListener(this);
     }
 
@@ -47,14 +75,22 @@ public final class TerritoryResolver implements RegistryListener {
         invalidateAll();
     }
 
+    public ColonyLookup colonyLookup() {
+        return colonyLookup;
+    }
+
+    public ClaimLookup claimLookup() {
+        return claimLookup;
+    }
+
     /**
      * Resolves the leaf entity governing {@code chunk}, if any. MineColonies is
      * consulted before OPAC: a colony's borders are the more specific claim.
      */
     public Optional<UUID> resolveLeaf(TerritoryChunk chunk) {
-        UUID cached = cache.get(chunk);
-        if (cached != null) {
-            return cached.equals(UNGOVERNED) ? Optional.empty() : Optional.of(cached);
+        CacheEntry cached = cache.get(chunk);
+        if (cached != null && currentTick.getAsLong() - cached.cachedAtTick() < ttlTicks) {
+            return cached.entityOrSentinel().equals(UNGOVERNED) ? Optional.empty() : Optional.of(cached.entityOrSentinel());
         }
 
         UUID resolved = colonyLookup.colonyIdAt(chunk)
@@ -66,7 +102,7 @@ public final class TerritoryResolver implements RegistryListener {
                         .flatMap(registry::entityIdForClaim))
                 .orElse(null);
 
-        cache.put(chunk, resolved != null ? resolved : UNGOVERNED);
+        cache.put(chunk, new CacheEntry(resolved != null ? resolved : UNGOVERNED, currentTick.getAsLong()));
         return Optional.ofNullable(resolved);
     }
 
@@ -81,7 +117,7 @@ public final class TerritoryResolver implements RegistryListener {
                 .orElseGet(Collections::emptyList);
     }
 
-    /** Invalidates a single chunk, e.g. on an OPAC/MineColonies claim-change signal. */
+    /** Invalidates a single chunk immediately, e.g. on a known claim-change signal. */
     public void invalidate(TerritoryChunk chunk) {
         cache.remove(chunk);
     }

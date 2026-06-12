@@ -1,0 +1,177 @@
+package com.theasshats.pcmcterritory.command;
+
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.theasshats.pcmcterritory.api.EntitySnapshot;
+import com.theasshats.pcmcterritory.api.TerritoryApi;
+import com.theasshats.pcmcterritory.core.ClaimKey;
+import com.theasshats.pcmcterritory.core.RealmEntity;
+import com.theasshats.pcmcterritory.core.Role;
+import com.theasshats.pcmcterritory.core.TerritoryChunk;
+import com.theasshats.pcmcterritory.data.RealmsSavedData;
+import com.theasshats.pcmcterritory.integration.TerritoryIntegrations;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
+
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * The Part 1 command surface (spec §7/§8): {@code /realm found}, {@code /realm info},
+ * {@code /realm whogoverns}. Server-authoritative — all checks run against the
+ * overworld-attached {@link RealmsSavedData}, never trusting the client.
+ */
+public final class RealmCommand {
+
+    private RealmCommand() {}
+
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(Commands.literal("realm")
+                .then(Commands.literal("found")
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .executes(ctx -> found(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
+                .then(Commands.literal("info")
+                        .executes(ctx -> info(ctx.getSource(), null))
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .executes(ctx -> info(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
+                .then(Commands.literal("whogoverns")
+                        .executes(ctx -> whoGoverns(ctx.getSource()))));
+    }
+
+    private static int found(CommandSourceStack source, String name) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+
+        if (!TerritoryIntegrations.mineColoniesPresent()) {
+            source.sendFailure(Component.translatable("commands.pcmc_territory.found.minecolonies_absent"));
+            return 0;
+        }
+
+        ServerLevel level = source.getLevel();
+        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
+        TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+
+        OptionalInt colonyId = data.resolver().colonyLookup().colonyIdAt(chunk);
+        if (colonyId.isEmpty()) {
+            source.sendFailure(Component.translatable("commands.pcmc_territory.found.no_colony"));
+            return 0;
+        }
+
+        Optional<RealmEntity> existingByName = data.registry().findByName(name);
+        Optional<UUID> existingOwner = data.registry().entityIdForColony(colonyId.getAsInt());
+
+        if (existingByName.isPresent()) {
+            RealmEntity entity = existingByName.get();
+
+            if (!entity.hasAtLeast(player.getUUID(), Role.OFFICER)) {
+                source.sendFailure(Component.translatable("commands.pcmc_territory.no_permission"));
+                return 0;
+            }
+            if (existingOwner.isPresent() && !existingOwner.get().equals(entity.id())) {
+                String ownerName = data.registry().get(existingOwner.get()).map(RealmEntity::name).orElse("?");
+                source.sendFailure(Component.translatable(
+                        "commands.pcmc_territory.found.colony_already_bound", colonyId.getAsInt(), ownerName));
+                return 0;
+            }
+
+            data.registry().bindColony(entity.id(), colonyId.getAsInt());
+            data.setDirty();
+            int boundColonyId = colonyId.getAsInt();
+            source.sendSuccess(() -> Component.translatable(
+                    "commands.pcmc_territory.found.success", entity.name(), boundColonyId), true);
+            return 1;
+        }
+
+        if (existingOwner.isPresent()) {
+            String ownerName = data.registry().get(existingOwner.get()).map(RealmEntity::name).orElse("?");
+            source.sendFailure(Component.translatable(
+                    "commands.pcmc_territory.found.colony_already_bound", colonyId.getAsInt(), ownerName));
+            return 0;
+        }
+
+        RealmEntity entity = data.registry().createEntity(name, player.getUUID(), level.getGameTime());
+        data.registry().bindColony(entity.id(), colonyId.getAsInt());
+        data.setDirty();
+
+        int boundColonyId = colonyId.getAsInt();
+        source.sendSuccess(() -> Component.translatable(
+                "commands.pcmc_territory.found.success", entity.name(), boundColonyId), true);
+        return 1;
+    }
+
+    private static int info(CommandSourceStack source, String name) throws CommandSyntaxException {
+        ServerLevel level = source.getLevel();
+        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
+
+        EntitySnapshot entity;
+        if (name != null) {
+            Optional<EntitySnapshot> byName = data.registry().findByName(name).map(EntitySnapshot::of);
+            if (byName.isEmpty()) {
+                source.sendFailure(Component.translatable("commands.pcmc_territory.info.not_found", name));
+                return 0;
+            }
+            entity = byName.get();
+        } else {
+            ServerPlayer player = source.getPlayerOrException();
+            TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+            Optional<EntitySnapshot> here = data.resolver().resolveLeaf(chunk)
+                    .flatMap(data.registry()::get)
+                    .map(EntitySnapshot::of);
+            if (here.isEmpty()) {
+                source.sendFailure(Component.translatable("commands.pcmc_territory.info.none_here"));
+                return 0;
+            }
+            entity = here.get();
+        }
+
+        sendInfo(source, entity);
+        return 1;
+    }
+
+    private static void sendInfo(CommandSourceStack source, EntitySnapshot entity) {
+        source.sendSuccess(() -> Component.translatable(
+                "commands.pcmc_territory.info.header", entity.name(), entity.id().toString()), false);
+
+        String members = entity.members().entrySet().stream()
+                .map(e -> e.getKey() + " (" + e.getValue() + ")")
+                .collect(Collectors.joining(", "));
+        source.sendSuccess(() -> Component.translatable(
+                "commands.pcmc_territory.info.members", members.isEmpty() ? "-" : members), false);
+
+        String colonies = entity.colonyIds().stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(", "));
+        source.sendSuccess(() -> Component.translatable(
+                "commands.pcmc_territory.info.colonies", colonies.isEmpty() ? "-" : colonies), false);
+
+        String claims = entity.claimKeys().stream()
+                .map(ClaimKey::ownerId)
+                .map(UUID::toString)
+                .collect(Collectors.joining(", "));
+        source.sendSuccess(() -> Component.translatable(
+                "commands.pcmc_territory.info.claims", claims.isEmpty() ? "-" : claims), false);
+    }
+
+    private static int whoGoverns(CommandSourceStack source) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        ServerLevel level = source.getLevel();
+        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
+        TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+
+        Optional<UUID> leaf = data.resolver().resolveLeaf(chunk);
+        if (leaf.isEmpty()) {
+            source.sendSuccess(() -> Component.translatable("commands.pcmc_territory.whogoverns.ungoverned"), false);
+            return 1;
+        }
+
+        String name = data.registry().get(leaf.get()).map(RealmEntity::name).orElse("?");
+        source.sendSuccess(() -> Component.translatable("commands.pcmc_territory.whogoverns.governed", name), false);
+        return 1;
+    }
+}

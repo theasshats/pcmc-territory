@@ -140,6 +140,32 @@ class TerritoryResolverTest {
     }
 
     @Test
+    void cacheEntryExpiresAfterTtlAndPicksUpExternalClaimChange() {
+        RealmsRegistry registry = new RealmsRegistry();
+        RealmEntity entity = registry.createEntity("Riverside", UUID.randomUUID(), 0L);
+        registry.bindColony(entity.id(), 7);
+
+        FakeColonyLookup colonyLookup = new FakeColonyLookup();
+        TerritoryChunk chunk = TerritoryChunk.of(OVERWORLD, 10, 20);
+        colonyLookup.colonies.put(chunk, 7);
+
+        long[] tick = {0L};
+        TerritoryResolver resolver = new TerritoryResolver(registry, colonyLookup, ClaimLookup.NOOP,
+                () -> tick[0], 20L);
+
+        assertEquals(entity.id(), resolver.resolveLeaf(chunk).orElseThrow());
+
+        // MineColonies abandons the colony "externally" — no registry event, so the
+        // cache entry is still present but stale.
+        colonyLookup.colonies.remove(chunk);
+        assertEquals(entity.id(), resolver.resolveLeaf(chunk).orElseThrow(), "still served from cache within TTL");
+
+        // advance past the TTL: the next lookup recomputes and observes the change.
+        tick[0] = 21L;
+        assertTrue(resolver.resolveLeaf(chunk).isEmpty(), "recomputed after TTL expiry");
+    }
+
+    @Test
     void softDependencyNoopsNeverThrow() {
         RealmsRegistry registry = new RealmsRegistry();
         TerritoryResolver resolver = new TerritoryResolver(registry, ColonyLookup.NOOP, ClaimLookup.NOOP);

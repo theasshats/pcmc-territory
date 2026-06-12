@@ -1,0 +1,16 @@
+{
+  "commands.pcmc_territory.found.success": "Founded realm '%s', bound to colony #%s.",
+  "commands.pcmc_territory.found.no_colony": "You must be standing inside a MineColonies colony to found a realm.",
+  "commands.pcmc_territory.found.minecolonies_absent": "MineColonies is not installed on this server; /realm found is unavailable.",
+  "commands.pcmc_territory.found.colony_already_bound": "Colony #%s is already governed by '%s'.",
+  "commands.pcmc_territory.found.name_taken": "A realm named '%s' already exists.",
+  "commands.pcmc_territory.info.not_found": "No realm named '%s'.",
+  "commands.pcmc_territory.info.none_here": "There is no realm here, and no name was given.",
+  "commands.pcmc_territory.info.header": "%s (%s)",
+  "commands.pcmc_territory.info.members": "Members: %s",
+  "commands.pcmc_territory.info.colonies": "Colonies: %s",
+  "commands.pcmc_territory.info.claims": "Claims: %s",
+  "commands.pcmc_territory.whogoverns.governed": "This chunk is governed by '%s'.",
+  "commands.pcmc_territory.whogoverns.ungoverned": "This chunk is ungoverned (wilderness).",
+  "commands.pcmc_territory.no_permission": "You must be a leader of this realm to do that."
+}

@@ -1,0 +1,46 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+issueTrackerURL = "https://github.com/theasshats/pcmc-territory/issues"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+authors = "${mod_authors}"
+description = '''${mod_description}'''
+
+# This mod is the read-only territory substrate: given a (level, chunk), which
+# political entity governs it? It reads MineColonies colonies and Open Parties
+# and Claims chunk claims and owns no claims of its own (spec §1/§9). Both are
+# soft dependencies — see the [[dependencies]] entries below.
+
+[[dependencies.${mod_id}]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "${neo_version_range}"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.${mod_id}]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "${minecraft_version_range}"
+    ordering = "NONE"
+    side = "BOTH"
+
+# Soft dependency: if absent, the colony resolver no-ops (spec §9).
+[[dependencies.${mod_id}]]
+    modId = "minecolonies"
+    type = "optional"
+    versionRange = "${minecolonies_version_range}"
+    ordering = "AFTER"
+    side = "BOTH"
+
+# Soft dependency: if absent, the claim resolver no-ops (spec §9).
+[[dependencies.${mod_id}]]
+    modId = "${opac_mod_id}"
+    type = "optional"
+    versionRange = "${opac_version_range}"
+    ordering = "AFTER"
+    side = "BOTH"
