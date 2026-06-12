@@ -15,7 +15,7 @@ soft-dependency jars and the NeoForge toolchain itself:
 | --- | --- | --- |
 | `maven.neoforged.net` | NeoForge / ModDevGradle artifacts | `403 host_not_allowed` |
 | `cursemaven.com` / `www.cursemaven.com` | MineColonies (`curse.maven:minecolonies-245506:8186694`) | `403 host_not_allowed` |
-| `api.modrinth.com` | Open Parties and Claims (`maven.modrinth:open-parties-and-claims:0.26.2-neoforge`) | `403 host_not_allowed` |
+| `api.modrinth.com` | Open Parties and Claims (`maven.modrinth:open-parties-and-claims:b16WHzyv`) | `403 host_not_allowed` |
 | `maven.ldtteam.com` | MineColonies's own dependency chain | `403 host_not_allowed` |
 | `maven.minecraftforge.net`, `libraries.minecraft.net`, `piston-meta.mojang.com` | Minecraft/Forge libraries | `403 host_not_allowed` |
 
@@ -69,8 +69,17 @@ returning an `IPlayerChunkClaimAPI` whose `getPlayerId()` becomes the `ClaimKey`
 entity binds. This matches the published javadoc surface
 (thexaero.github.io/open-parties-and-claims) for
 `xaero.pac.common.server.claims.api`, but — same caveat — has **not** been compiled
-against the real `open-parties-and-claims-0.26.2-neoforge` jar (Modrinth `gF3BGWvG`),
-which could not be downloaded here.
+against the real `open-parties-and-claims-neoforge-1.21.1-0.26.2` jar (Modrinth
+`gF3BGWvG`), which could not be downloaded here.
+
+**Resolved by the first CI run (lesson):** the spike originally wrote the Modrinth
+coordinate as `0.26.2-neoforge`, guessing a `<version>-<loader>` suffix format. CI
+*could* reach Modrinth maven and got a clean "not found" — OPAC's actual version
+numbers embed loader and MC version as a *prefix* (`neoforge-1.21.1-0.26.2`, matching
+the jar filename). The dependency is now pinned by Modrinth version *id*
+(`b16WHzyv`, from the pack repo's `mods/open-parties-and-claims.pw.toml`), which is
+immutable and can't be mis-formatted. When adding a Modrinth dep without API access,
+take the version id straight from a packwiz manifest or the version page URL.
 
 If the package/method names differ, `OpacClaimLookup` is the one file to fix;
 `ClaimLookup` and its callers are unaffected.

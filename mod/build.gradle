@@ -68,8 +68,10 @@ dependencies {
     // MineColonies 1.1.1327-1.21.1-snapshot, CurseForge project 245506 / file 8186694.
     compileOnly "curse.maven:minecolonies-${minecolonies_curse_project}:${minecolonies_curse_file}"
 
-    // Open Parties and Claims 0.26.2 neoforge, Modrinth project gF3BGWvG.
-    compileOnly "maven.modrinth:open-parties-and-claims:${opac_version}-neoforge"
+    // Open Parties and Claims neoforge-1.21.1-0.26.2, Modrinth project gF3BGWvG,
+    // resolved by version id (see gradle.properties — the version-number form differs
+    // from the jar-suffix form that failed CI).
+    compileOnly "maven.modrinth:open-parties-and-claims:${opac_modrinth_version}"
 }
 
 // :core is a plain Java library bundled into the mod jar so RealmsSavedData etc.

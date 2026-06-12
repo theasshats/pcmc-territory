@@ -58,7 +58,7 @@ they aren't lost before that work is scoped:
 | Mod | Version | Mod ID | If absent |
 | --- | --- | --- | --- |
 | MineColonies | 1.1.1327-1.21.1-snapshot | `minecolonies` | Colony resolution no-ops (`ColonyLookup.NOOP`); `/realm found` reports MineColonies as absent. |
-| Open Parties and Claims | 0.26.2-neoforge | `openpartiesandclaims` | Claim resolution no-ops (`ClaimLookup.NOOP`). |
+| Open Parties and Claims | neoforge-1.21.1-0.26.2 | `openpartiesandclaims` | Claim resolution no-ops (`ClaimLookup.NOOP`). |
 
 Either or both can be missing without the mod crashing — territory resolution simply
 degrades to "no colonies/claims known," and chunks resolve as ungoverned.

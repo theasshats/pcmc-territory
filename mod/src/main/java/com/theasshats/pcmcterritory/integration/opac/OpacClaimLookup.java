@@ -16,7 +16,7 @@ import java.util.UUID;
  * Position -&gt; OPAC claim owner (spec §6).
  *
  * <p><b>SPIKE — unverified against the real jar (see docs/SPIKE-PART1.md):</b> this
- * sandbox cannot resolve {@code maven.modrinth:open-parties-and-claims:0.26.2-neoforge}
+ * sandbox cannot resolve {@code maven.modrinth:open-parties-and-claims:b16WHzyv}
  * (Modrinth maven is network-blocked here), so the {@code xaero.pac.common.server.claims.api}
  * package/types below are based on the published javadoc surface
  * (thexaero.github.io/open-parties-and-claims) but have not been compiled against the
