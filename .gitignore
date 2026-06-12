@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+*/build/
+out/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# Run directories (NeoForge dev runs)
+run/
+runs/

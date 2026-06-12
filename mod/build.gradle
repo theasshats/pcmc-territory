@@ -1,0 +1,83 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.78'
+}
+
+base {
+    archivesName = project.mod_id
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(java_version)
+    }
+}
+
+repositories {
+    mavenCentral()
+    // MineColonies (CurseForge mirror via CurseMaven — see docs/SPIKE-PART1.md)
+    maven {
+        url = 'https://www.cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+    // Open Parties and Claims (Modrinth maven — see docs/SPIKE-PART1.md)
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
+}
+
+neoForge {
+    version = project.neo_version
+
+    // Generates run configurations for local testing (not usable in this sandbox —
+    // see docs/SPIKE-PART1.md). Kept minimal: client/server/data with this mod loaded.
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+        data {
+            data()
+            programArguments.addAll(
+                    '--mod', project.mod_id,
+                    '--all',
+                    '--output', file('src/generated/resources').getAbsolutePath(),
+                    '--existing', file('src/main/resources').getAbsolutePath()
+            )
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    implementation project(':core')
+
+    // --- Soft dependencies (compile-time only) ---
+    // MineColonies 1.1.1327-1.21.1-snapshot, CurseForge project 245506 / file 8186694.
+    compileOnly "curse.maven:minecolonies-${minecolonies_curse_project}:${minecolonies_curse_file}"
+
+    // Open Parties and Claims 0.26.2 neoforge, Modrinth project gF3BGWvG.
+    compileOnly "maven.modrinth:open-parties-and-claims:${opac_version}-neoforge"
+}
+
+// :core is a plain Java library bundled into the mod jar so RealmsSavedData etc.
+// can use it at runtime without requiring server operators to install it separately.
+jar {
+    from(project(':core').sourceSets.main.output)
+}
+
+tasks.named('compileJava').configure {
+    dependsOn ':core:classes'
+}
