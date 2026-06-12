@@ -37,6 +37,15 @@ jobs:
           name: test-reports
           path: '**/build/reports/tests/'
 
+      # Every successful run uploads the jar so playtesters can grab a build
+      # from any branch without a local JDK/Gradle toolchain (docs/PLAYTESTING.md).
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcmc_territory-jar
+          path: mod/build/libs/*.jar
+          retention-days: 14
+
       - name: Locate mod jar
         if: startsWith(github.ref, 'refs/tags/v')
         id: jar

@@ -42,7 +42,13 @@ public final class RealmCommand {
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .executes(ctx -> info(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
                 .then(Commands.literal("whogoverns")
-                        .executes(ctx -> whoGoverns(ctx.getSource()))));
+                        .executes(ctx -> whoGoverns(ctx.getSource())))
+                .then(Commands.literal("debug")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("bindclaim")
+                                .then(Commands.argument("name", StringArgumentType.string())
+                                        .executes(ctx -> bindClaim(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "name")))))));
     }
 
     private static int found(CommandSourceStack source, String name) throws CommandSyntaxException {
@@ -172,6 +178,55 @@ public final class RealmCommand {
 
         String name = data.registry().get(leaf.get()).map(RealmEntity::name).orElse("?");
         source.sendSuccess(() -> Component.translatable("commands.pcmc_territory.whogoverns.governed", name), false);
+        return 1;
+    }
+
+    /**
+     * Op-only playtest/debug helper: binds the OPAC claim covering the player's
+     * current chunk to an existing entity. Part 1 has no player-facing claim
+     * binding (that arrives with Part 2's government commands), but without this
+     * the OPAC resolution path — registry {@code bindClaim} + resolver fallback —
+     * would be unreachable in-game and the playtest checklist couldn't cover it
+     * (see docs/PLAYTESTING.md, scenario 3).
+     */
+    private static int bindClaim(CommandSourceStack source, String name) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+
+        if (!TerritoryIntegrations.opacPresent()) {
+            source.sendFailure(Component.translatable("commands.pcmc_territory.debug.opac_absent"));
+            return 0;
+        }
+
+        ServerLevel level = source.getLevel();
+        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
+        TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+
+        Optional<ClaimKey> claim = data.resolver().claimLookup().claimAt(chunk);
+        if (claim.isEmpty()) {
+            source.sendFailure(Component.translatable("commands.pcmc_territory.debug.no_claim_here"));
+            return 0;
+        }
+
+        Optional<RealmEntity> entity = data.registry().findByName(name);
+        if (entity.isEmpty()) {
+            source.sendFailure(Component.translatable("commands.pcmc_territory.info.not_found", name));
+            return 0;
+        }
+
+        Optional<UUID> existing = data.registry().entityIdForClaim(claim.get());
+        if (existing.isPresent() && !existing.get().equals(entity.get().id())) {
+            String ownerName = data.registry().get(existing.get()).map(RealmEntity::name).orElse("?");
+            source.sendFailure(Component.translatable("commands.pcmc_territory.debug.claim_already_bound", ownerName));
+            return 0;
+        }
+
+        data.registry().bindClaim(entity.get().id(), claim.get());
+        data.setDirty();
+
+        String claimOwner = claim.get().ownerId().toString();
+        String entityName = entity.get().name();
+        source.sendSuccess(() -> Component.translatable(
+                "commands.pcmc_territory.debug.bindclaim.success", claimOwner, entityName), true);
         return 1;
     }
 }

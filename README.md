@@ -44,6 +44,10 @@ degrades to "no colonies/claims known," and chunks resolve as ungoverned.
   claim keys. Defaults to the entity governing your current chunk.
 - `/realm whogoverns` — debug command reporting which entity (if any) governs your
   current chunk.
+- `/realm debug bindclaim <name>` — **op-only** playtest helper: binds the OPAC claim
+  covering your current chunk to the named entity. Part 1 has no player-facing claim
+  binding (that arrives with Part 2); this exists so the OPAC resolution path can be
+  exercised in-game at all.
 
 ## Building
 
@@ -66,7 +70,9 @@ mod-mirror pattern described in `project-commonwealth`'s `docs/CUSTOM-MODS.md`.
 
 CI green (`./gradlew build` succeeding) means `:mod` **compiles** against the real
 MineColonies/OPAC jars. It does **not** mean any of the following have been verified —
-this sandbox cannot launch Minecraft, so all of the below needs a real client/server:
+this sandbox cannot launch Minecraft, so all of the below needs a real client/server.
+**Step-by-step setup and a scenario walkthrough covering every item live in
+[`docs/PLAYTESTING.md`](docs/PLAYTESTING.md).**
 
 - [ ] Client boots to the main menu with this mod + MineColonies + OPAC installed.
 - [ ] `/realm found <name>` while standing inside a MineColonies colony successfully
@@ -74,8 +80,14 @@ this sandbox cannot launch Minecraft, so all of the below needs a real client/se
 - [ ] `/realm whogoverns` reports the correct entity name while standing inside that
       colony's claimed chunks.
 - [ ] `/realm whogoverns` reports the correct entity while standing inside an Open
-      Parties and Claims claim bound via the registry (no MineColonies colony there).
+      Parties and Claims claim bound via `/realm debug bindclaim` (no MineColonies
+      colony there).
 - [ ] `/realm whogoverns` reports "ungoverned" in wilderness (no colony, no claim).
+- [ ] Unclaiming the OPAC chunk flips `/realm whogoverns` to "ungoverned" within
+      ~1–2 seconds, with no restart (the resolver's TTL picking up the external
+      change — `docs/SPIKE-PART1.md` §4).
+- [ ] Entities, members, and bindings survive a save-and-quit / server restart
+      (SavedData round-trip).
 - [ ] `/realm info [name]` prints sensible header/members/colonies/claims for a bound
       entity.
 - [ ] No measurable TPS impact from repeated `/realm whogoverns` calls or normal block
