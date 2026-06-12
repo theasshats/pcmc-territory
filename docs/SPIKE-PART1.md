@@ -28,7 +28,7 @@ zero Minecraft/NeoForge/MineColonies/OPAC deps, builds and tests against Maven C
 only) and `:mod` (the NeoForge mod, depends on `:core`, only buildable in CI/on a
 maintainer box with full internet).
 
-`./gradlew :core:test` passes (18 tests). `./gradlew :mod:build` / `./gradlew build`
+`./gradlew :core:test` passes (20 tests). `./gradlew :mod:build` / `./gradlew build`
 have **not** been run successfully here — `.github/workflows/build.yml` runs them with
 full CI network access, and that result is the first real compile signal.
 

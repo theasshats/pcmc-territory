@@ -127,6 +127,8 @@ this sandbox cannot launch Minecraft, so all of the below needs a real client/se
 - [ ] Removing both — server starts without crashing; all chunks resolve as
       ungoverned; `/realm found` reports MineColonies absent.
 
-**Green CI is not in-game verification.** Until the checklist above is run on a real
-server with the real dependency jars, treat `MineColoniesColonyLookup` and
-`OpacClaimLookup`'s API calls (see `docs/SPIKE-PART1.md` §2–3) as unverified.
+**Green CI is not in-game verification.** CI compiles `MineColoniesColonyLookup` and
+`OpacClaimLookup` against the real dependency jars (see `docs/SPIKE-PART1.md` §2–3 for
+the verified API surfaces), but until the checklist above is run on a real server,
+their runtime behavior — does standing in a colony or claim actually resolve? — is
+still unverified.

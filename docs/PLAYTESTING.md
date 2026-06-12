@@ -5,9 +5,10 @@ Step-by-step instructions for running the maintainer playtest checklist in
 human-on-a-real-instance task. Green CI means `:mod` compiled against the real
 MineColonies/OPAC jars — nothing more.
 
-The first playtest is also the moment the unverified API assumptions in
-`docs/SPIKE-PART1.md` §2–3 meet reality: if `/realm found` or `/realm whogoverns`
-misbehaves, suspect `MineColoniesColonyLookup` / `OpacClaimLookup` first.
+The adapters' API surfaces are compile-verified (`docs/SPIKE-PART1.md` §2–3), but the
+first playtest is the moment their *runtime* assumptions meet reality: if
+`/realm found` or `/realm whogoverns` misbehaves, suspect
+`MineColoniesColonyLookup` / `OpacClaimLookup` first.
 
 ## 1. Get the jar
 
@@ -127,6 +128,6 @@ measurable cost here is a bug, not a tuning knob.
 
 Tick the checklist in `README.md` (or the PR's playtest section) per item. For
 any failure, capture the log/crash report and note which scenario step — a
-failure in scenarios 2–3 most likely means one of the two unverified adapter
-files (`MineColoniesColonyLookup`, `OpacClaimLookup`) needs its API call fixed
-against the real jar, which is a one-file change by design.
+failure in scenarios 2–3 most likely means one of the two adapter files
+(`MineColoniesColonyLookup`, `OpacClaimLookup`) is calling the right API with the
+wrong runtime assumption; fixing it is a one-file change by design.
