@@ -10,6 +10,7 @@ import xaero.pac.common.server.claims.api.IServerClaimsManagerAPI;
 import xaero.pac.common.server.claims.api.OpenPACServerAPI;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Position -&gt; OPAC claim owner (spec §6).
@@ -46,6 +47,11 @@ public final class OpacClaimLookup implements ClaimLookup {
         if (claim == null) {
             return Optional.empty();
         }
-        return Optional.of(new ClaimKey(claim.getPlayerId()));
+        UUID ownerId = claim.getPlayerId();
+        if (ownerId == null) {
+            // Server/admin-reserved claims may have no owning player or party.
+            return Optional.empty();
+        }
+        return Optional.of(new ClaimKey(ownerId));
     }
 }

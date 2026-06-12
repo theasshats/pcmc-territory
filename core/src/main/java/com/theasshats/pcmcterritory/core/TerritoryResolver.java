@@ -88,8 +88,9 @@ public final class TerritoryResolver implements RegistryListener {
      * consulted before OPAC: a colony's borders are the more specific claim.
      */
     public Optional<UUID> resolveLeaf(TerritoryChunk chunk) {
+        long now = currentTick.getAsLong();
         CacheEntry cached = cache.get(chunk);
-        if (cached != null && currentTick.getAsLong() - cached.cachedAtTick() < ttlTicks) {
+        if (cached != null && now - cached.cachedAtTick() < ttlTicks) {
             return cached.entityOrSentinel().equals(UNGOVERNED) ? Optional.empty() : Optional.of(cached.entityOrSentinel());
         }
 
@@ -102,7 +103,7 @@ public final class TerritoryResolver implements RegistryListener {
                         .flatMap(registry::entityIdForClaim))
                 .orElse(null);
 
-        cache.put(chunk, new CacheEntry(resolved != null ? resolved : UNGOVERNED, currentTick.getAsLong()));
+        cache.put(chunk, new CacheEntry(resolved != null ? resolved : UNGOVERNED, now));
         return Optional.ofNullable(resolved);
     }
 
@@ -117,7 +118,12 @@ public final class TerritoryResolver implements RegistryListener {
                 .orElseGet(Collections::emptyList);
     }
 
-    /** Invalidates a single chunk immediately, e.g. on a known claim-change signal. */
+    /**
+     * Invalidates a single chunk immediately. Currently unused — registry edits go
+     * through {@link #invalidateAll()} and external claim changes rely on the TTL —
+     * but kept as the hook for a future immediate claim-change signal, should one be
+     * confirmed against the real MineColonies/OPAC jars (docs/SPIKE-PART1.md §4).
+     */
     public void invalidate(TerritoryChunk chunk) {
         cache.remove(chunk);
     }

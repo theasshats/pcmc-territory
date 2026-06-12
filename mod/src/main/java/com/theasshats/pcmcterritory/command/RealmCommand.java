@@ -60,8 +60,8 @@ public final class RealmCommand {
         }
 
         ServerLevel level = source.getLevel();
-        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
-        TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+        RealmsSavedData data = data(level);
+        TerritoryChunk chunk = chunkAt(level, player);
 
         OptionalInt colonyId = data.resolver().colonyLookup().colonyIdAt(chunk);
         if (colonyId.isEmpty()) {
@@ -80,7 +80,7 @@ public final class RealmCommand {
                 return 0;
             }
             if (existingOwner.isPresent() && !existingOwner.get().equals(entity.id())) {
-                String ownerName = data.registry().get(existingOwner.get()).map(RealmEntity::name).orElse("?");
+                String ownerName = entityName(data, existingOwner.get());
                 source.sendFailure(Component.translatable(
                         "commands.pcmc_territory.found.colony_already_bound", colonyId.getAsInt(), ownerName));
                 return 0;
@@ -95,7 +95,7 @@ public final class RealmCommand {
         }
 
         if (existingOwner.isPresent()) {
-            String ownerName = data.registry().get(existingOwner.get()).map(RealmEntity::name).orElse("?");
+            String ownerName = entityName(data, existingOwner.get());
             source.sendFailure(Component.translatable(
                     "commands.pcmc_territory.found.colony_already_bound", colonyId.getAsInt(), ownerName));
             return 0;
@@ -113,7 +113,7 @@ public final class RealmCommand {
 
     private static int info(CommandSourceStack source, String name) throws CommandSyntaxException {
         ServerLevel level = source.getLevel();
-        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
+        RealmsSavedData data = data(level);
 
         EntitySnapshot entity;
         if (name != null) {
@@ -125,7 +125,7 @@ public final class RealmCommand {
             entity = byName.get();
         } else {
             ServerPlayer player = source.getPlayerOrException();
-            TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+            TerritoryChunk chunk = chunkAt(level, player);
             Optional<EntitySnapshot> here = data.resolver().resolveLeaf(chunk)
                     .flatMap(data.registry()::get)
                     .map(EntitySnapshot::of);
@@ -167,8 +167,8 @@ public final class RealmCommand {
     private static int whoGoverns(CommandSourceStack source) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         ServerLevel level = source.getLevel();
-        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
-        TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+        RealmsSavedData data = data(level);
+        TerritoryChunk chunk = chunkAt(level, player);
 
         Optional<UUID> leaf = data.resolver().resolveLeaf(chunk);
         if (leaf.isEmpty()) {
@@ -176,7 +176,7 @@ public final class RealmCommand {
             return 1;
         }
 
-        String name = data.registry().get(leaf.get()).map(RealmEntity::name).orElse("?");
+        String name = entityName(data, leaf.get());
         source.sendSuccess(() -> Component.translatable("commands.pcmc_territory.whogoverns.governed", name), false);
         return 1;
     }
@@ -198,8 +198,8 @@ public final class RealmCommand {
         }
 
         ServerLevel level = source.getLevel();
-        RealmsSavedData data = RealmsSavedData.get(level.getServer().overworld());
-        TerritoryChunk chunk = TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+        RealmsSavedData data = data(level);
+        TerritoryChunk chunk = chunkAt(level, player);
 
         Optional<ClaimKey> claim = data.resolver().claimLookup().claimAt(chunk);
         if (claim.isEmpty()) {
@@ -213,9 +213,14 @@ public final class RealmCommand {
             return 0;
         }
 
+        if (!entity.get().hasAtLeast(player.getUUID(), Role.OFFICER)) {
+            source.sendFailure(Component.translatable("commands.pcmc_territory.no_permission"));
+            return 0;
+        }
+
         Optional<UUID> existing = data.registry().entityIdForClaim(claim.get());
         if (existing.isPresent() && !existing.get().equals(entity.get().id())) {
-            String ownerName = data.registry().get(existing.get()).map(RealmEntity::name).orElse("?");
+            String ownerName = entityName(data, existing.get());
             source.sendFailure(Component.translatable("commands.pcmc_territory.debug.claim_already_bound", ownerName));
             return 0;
         }
@@ -224,9 +229,24 @@ public final class RealmCommand {
         data.setDirty();
 
         String claimOwner = claim.get().ownerId().toString();
-        String entityName = entity.get().name();
+        String boundEntityName = entity.get().name();
         source.sendSuccess(() -> Component.translatable(
-                "commands.pcmc_territory.debug.bindclaim.success", claimOwner, entityName), true);
+                "commands.pcmc_territory.debug.bindclaim.success", claimOwner, boundEntityName), true);
         return 1;
+    }
+
+    /** Fetches the overworld-attached realms data for {@code level} (spec §2). */
+    private static RealmsSavedData data(ServerLevel level) {
+        return RealmsSavedData.get(level.getServer().overworld());
+    }
+
+    /** Resolves the territory chunk {@code player} currently stands in. */
+    private static TerritoryChunk chunkAt(ServerLevel level, ServerPlayer player) {
+        return TerritoryApi.toTerritoryChunk(level, new ChunkPos(player.blockPosition()));
+    }
+
+    /** Looks up an entity's display name, falling back to {@code "?"} if it no longer exists. */
+    private static String entityName(RealmsSavedData data, UUID id) {
+        return data.registry().get(id).map(RealmEntity::name).orElse("?");
     }
 }

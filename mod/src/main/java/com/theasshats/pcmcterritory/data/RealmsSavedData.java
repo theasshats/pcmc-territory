@@ -8,12 +8,14 @@ import com.theasshats.pcmcterritory.core.RealmsRegistry;
 import com.theasshats.pcmcterritory.core.Role;
 import com.theasshats.pcmcterritory.core.TerritoryResolver;
 import com.theasshats.pcmcterritory.event.RealmEventBridge;
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
+import org.slf4j.Logger;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,6 +35,8 @@ import java.util.UUID;
 public final class RealmsSavedData extends SavedData {
 
     public static final String DATA_NAME = "pcmc_territory";
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private final RealmsRegistry registry = new RealmsRegistry();
     private final TerritoryResolver resolver;
@@ -69,30 +73,35 @@ public final class RealmsSavedData extends SavedData {
         ListTag entitiesTag = tag.getList("entities", Tag.TAG_COMPOUND);
         for (int i = 0; i < entitiesTag.size(); i++) {
             CompoundTag entityTag = entitiesTag.getCompound(i);
+            try {
+                UUID id = entityTag.getUUID("id");
+                String name = entityTag.getString("name");
+                long createdTick = entityTag.getLong("createdTick");
 
-            UUID id = entityTag.getUUID("id");
-            String name = entityTag.getString("name");
-            long createdTick = entityTag.getLong("createdTick");
+                Map<UUID, Role> members = new LinkedHashMap<>();
+                ListTag membersTag = entityTag.getList("members", Tag.TAG_COMPOUND);
+                for (int m = 0; m < membersTag.size(); m++) {
+                    CompoundTag memberTag = membersTag.getCompound(m);
+                    members.put(memberTag.getUUID("player"), Role.valueOf(memberTag.getString("role")));
+                }
 
-            Map<UUID, Role> members = new LinkedHashMap<>();
-            ListTag membersTag = entityTag.getList("members", Tag.TAG_COMPOUND);
-            for (int m = 0; m < membersTag.size(); m++) {
-                CompoundTag memberTag = membersTag.getCompound(m);
-                members.put(memberTag.getUUID("player"), Role.valueOf(memberTag.getString("role")));
+                Set<Integer> colonyIds = new LinkedHashSet<>();
+                for (int colonyId : entityTag.getIntArray("colonyIds")) {
+                    colonyIds.add(colonyId);
+                }
+
+                Set<ClaimKey> claimKeys = new LinkedHashSet<>();
+                ListTag claimsTag = entityTag.getList("claimKeys", Tag.TAG_COMPOUND);
+                for (int c = 0; c < claimsTag.size(); c++) {
+                    claimKeys.add(new ClaimKey(claimsTag.getCompound(c).getUUID("owner")));
+                }
+
+                data.registry.restoreEntity(id, name, createdTick, members, colonyIds, claimKeys);
+            } catch (RuntimeException e) {
+                // A corrupted entry or an incompatible save from a future/older version
+                // shouldn't take the whole world down with it - skip just this entity.
+                LOGGER.error("Skipping malformed entity at index {} in {} save data: {}", i, DATA_NAME, e.toString());
             }
-
-            Set<Integer> colonyIds = new LinkedHashSet<>();
-            for (int colonyId : entityTag.getIntArray("colonyIds")) {
-                colonyIds.add(colonyId);
-            }
-
-            Set<ClaimKey> claimKeys = new LinkedHashSet<>();
-            ListTag claimsTag = entityTag.getList("claimKeys", Tag.TAG_COMPOUND);
-            for (int c = 0; c < claimsTag.size(); c++) {
-                claimKeys.add(new ClaimKey(claimsTag.getCompound(c).getUUID("owner")));
-            }
-
-            data.registry.restoreEntity(id, name, createdTick, members, colonyIds, claimKeys);
         }
         return data;
     }
