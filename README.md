@@ -72,7 +72,7 @@ degrades to "no colonies/claims known," and chunks resolve as ungoverned.
   claim keys. Defaults to the entity governing your current chunk.
 - `/realm whogoverns` — debug command reporting which entity (if any) governs your
   current chunk.
-- `/realm debug bindclaim <name>` — **op-only** playtest helper: binds the OPAC claim
+- `/realm debug bindclaim <name>` — **op + OFFICER-only** playtest helper: binds the OPAC claim
   covering your current chunk to the named entity. Part 1 has no player-facing claim
   binding (that arrives with Part 2); this exists so the OPAC resolution path can be
   exercised in-game at all.

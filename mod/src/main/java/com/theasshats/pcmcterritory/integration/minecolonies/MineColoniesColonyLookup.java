@@ -17,15 +17,16 @@ import java.util.OptionalInt;
 /**
  * Position -&gt; MineColonies colony id (spec §6).
  *
- * <p><b>SPIKE — unverified against the real jar (see docs/SPIKE-PART1.md):</b> this
- * sandbox cannot resolve {@code curse.maven:minecolonies-245506:8186694}, so the
- * entry point below — {@code IMinecoloniesAPI.getInstance().getColonyManager()
- * .getColonyByPosFromWorld(Level, BlockPos)} — is based on the documented 1.21.1
- * API surface but has not been compiled against the actual jar. If the method name
- * or package differs, this is the one file to fix; {@link ColonyLookup} callers are
- * unaffected. MineColonies also attaches a per-chunk capability recording the owning
- * colony id, which would be an O(1) alternative to a position lookup if available —
- * worth checking on the box as a perf upgrade once this compiles.
+ * <p><b>Compile-verified, not yet runtime-verified (see docs/SPIKE-PART1.md §2):</b>
+ * the entry point below — {@code IMinecoloniesAPI.getInstance().getColonyManager()
+ * .getColonyByPosFromWorld(Level, BlockPos)} — is the documented 1.21.1 API surface,
+ * and CI compiles this class against the real
+ * {@code curse.maven:minecolonies-245506:8186694} jar (the spike's guess survived
+ * contact). In-game behavior still needs the docs/PLAYTESTING.md pass. If a future
+ * version moves the method or package, this is the one file to fix;
+ * {@link ColonyLookup} callers are unaffected. MineColonies also attaches a per-chunk
+ * capability recording the owning colony id, which would be an O(1) alternative to
+ * this position lookup if available — worth checking on the box as a perf upgrade.
  */
 public final class MineColoniesColonyLookup implements ColonyLookup {
 

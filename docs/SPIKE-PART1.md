@@ -168,7 +168,7 @@ should flag any divergence worth aligning.
 ## 6. What this means for "done"
 
 - `:core` is the part of spec §6 that's fully implemented *and* verified
-  (`./gradlew :core:test`, 18/18 passing): the registry, entity model, reverse indexes,
+  (`./gradlew :core:test`, 20/20 passing): the registry, entity model, reverse indexes,
   and the TTL-based resolver/cache.
 - `:mod` (NeoForge glue, MineColonies/OPAC adapters, commands, SavedData, public API,
   events) is implemented per the documented API surfaces above but **compiles for the
