@@ -89,6 +89,28 @@ class TerritoryResolverTest {
     }
 
     @Test
+    void unfoundedColonyShieldsChunkFromOutsideClaim() {
+        RealmsRegistry registry = new RealmsRegistry();
+        // An OPAC claim is bound to a realm...
+        RealmEntity claimEntity = registry.createEntity("ClaimTown", UUID.randomUUID(), 0L);
+        ClaimKey claimKey = new ClaimKey(UUID.randomUUID());
+        registry.bindClaim(claimEntity.id(), claimKey);
+
+        // ...on a chunk that also sits inside colony #1, which nobody has founded.
+        TerritoryChunk chunk = TerritoryChunk.of(OVERWORLD, 0, 0);
+        FakeColonyLookup colonyLookup = new FakeColonyLookup();
+        colonyLookup.colonies.put(chunk, 1);
+        FakeClaimLookup claimLookup = new FakeClaimLookup();
+        claimLookup.claims.put(chunk, claimKey);
+
+        TerritoryResolver resolver = new TerritoryResolver(registry, colonyLookup, claimLookup);
+
+        // The colony's borders shield the chunk: ungoverned, NOT handed to the claim's realm.
+        assertTrue(resolver.resolveLeaf(chunk).isEmpty(),
+                "an unfounded colony must not fall through to an overlapping outside claim");
+    }
+
+    @Test
     void wildernessResolvesEmptyAndIsCached() {
         RealmsRegistry registry = new RealmsRegistry();
         TerritoryChunk chunk = TerritoryChunk.of(OVERWORLD, 100, 100);

@@ -3,6 +3,7 @@ package com.theasshats.pcmcterritory.core;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -84,8 +85,15 @@ public final class TerritoryResolver implements RegistryListener {
     }
 
     /**
-     * Resolves the leaf entity governing {@code chunk}, if any. MineColonies is
-     * consulted before OPAC: a colony's borders are the more specific claim.
+     * Resolves the leaf entity governing {@code chunk}, if any.
+     *
+     * <p>A MineColonies colony's borders take strict precedence over OPAC claims and
+     * <em>shield</em> the chunk: if the chunk is inside any colony, the result is that
+     * colony's bound realm, or empty ("ungoverned") when the colony has not been
+     * founded as a realm — it never falls through to an overlapping OPAC claim. An OPAC
+     * claim is consulted only for chunks outside every colony. (This shield-over-
+     * fall-through choice is a deliberate Part 1 decision — see the "combined borders"
+     * note in README.md.)
      */
     public Optional<UUID> resolveLeaf(TerritoryChunk chunk) {
         long now = currentTick.getAsLong();
@@ -94,14 +102,13 @@ public final class TerritoryResolver implements RegistryListener {
             return cached.entityOrSentinel().equals(UNGOVERNED) ? Optional.empty() : Optional.of(cached.entityOrSentinel());
         }
 
-        UUID resolved = colonyLookup.colonyIdAt(chunk)
-                .stream()
-                .boxed()
-                .flatMap(colonyId -> registry.entityIdForColony(colonyId).stream())
-                .findFirst()
-                .or(() -> claimLookup.claimAt(chunk)
-                        .flatMap(registry::entityIdForClaim))
-                .orElse(null);
+        OptionalInt colonyId = colonyLookup.colonyIdAt(chunk);
+        UUID resolved = colonyId.isPresent()
+                // Inside a colony: resolve to its realm if founded, else ungoverned. A
+                // colony's borders shield the chunk from any overlapping outside claim.
+                ? registry.entityIdForColony(colonyId.getAsInt()).orElse(null)
+                // Outside every colony: fall back to an OPAC claim, if one is bound.
+                : claimLookup.claimAt(chunk).flatMap(registry::entityIdForClaim).orElse(null);
 
         cache.put(chunk, new CacheEntry(resolved != null ? resolved : UNGOVERNED, now));
         return Optional.ofNullable(resolved);

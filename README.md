@@ -21,12 +21,13 @@ A few directions discussed for Part 2 (`pcmc-realms`) and beyond are recorded he
 they aren't lost before that work is scoped:
 
 - **Combined city/faction borders.** The data model already supports this: a
-  `RealmEntity` can hold both `colonyIds` and bound `claimKeys`, and
-  `TerritoryResolver.resolveLeaf` falls through colony → claim for the same
-  registry. So a city's MineColonies border plus any OPAC claims its members bind
-  to it already resolve as one combined territory today — Part 1 is missing only a
-  player-facing bind command (`/realm debug bindclaim` is the op-only stand-in for
-  exercising that path).
+  `RealmEntity` can hold both `colonyIds` and bound `claimKeys`. A chunk inside a
+  colony resolves to that colony's realm, and an OPAC-claimed chunk outside every
+  colony resolves to the realm that bound it — colony borders take strict precedence
+  and shield their chunks from outside claims. So a city's MineColonies border plus
+  any OPAC claims its members bind to it already resolve as one combined territory
+  today — Part 1 is missing only a player-facing bind command (`/realm debug
+  bindclaim` is the op + OFFICER-only stand-in for exercising that path).
 - **Tier-gated claim allowances.** Citizens start with a small OPAC claim allowance;
   MineColonies city-tier growth raises it; confederation/faction leaders hold a
   larger pool they can grant to members as "charters" (e.g. to start an outpost or
