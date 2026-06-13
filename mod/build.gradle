@@ -7,6 +7,8 @@ base {
     archivesName = project.mod_id
 }
 
+version = project.mod_version
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(java_version)
@@ -78,6 +80,33 @@ dependencies {
 // can use it at runtime without requiring server operators to install it separately.
 jar {
     from(project(':core').sourceSets.main.output)
+}
+
+// neoforge.mods.toml in src/main/resources is a template: FML rejects a jar whose
+// metadata still contains literal ${...} placeholders ("is not a valid mod file",
+// which then cascades into an unrelated-looking Quark render-init crash). The spike
+// scaffold omitted this expansion and green CI didn't catch it — the first playtest
+// did. CI now validates the packaged mods.toml (see .github/workflows/build.yml).
+var metadataProperties = [
+        loader_version_range      : loader_version_range,
+        mod_license               : mod_license,
+        mod_id                    : mod_id,
+        mod_version               : mod_version,
+        mod_name                  : mod_name,
+        mod_authors               : mod_authors,
+        mod_description           : mod_description,
+        neo_version_range         : neo_version_range,
+        minecraft_version_range   : minecraft_version_range,
+        minecolonies_version_range: minecolonies_version_range,
+        opac_mod_id               : opac_mod_id,
+        opac_version_range        : opac_version_range,
+]
+
+tasks.named('processResources', ProcessResources).configure {
+    inputs.properties metadataProperties
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand metadataProperties
+    }
 }
 
 tasks.named('compileJava').configure {

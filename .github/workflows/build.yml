@@ -30,6 +30,33 @@ jobs:
       - name: Run :core tests
         run: ./gradlew :core:test
 
+      # A jar that compiles can still be unloadable: the first playtest shipped a jar
+      # whose neoforge.mods.toml had unexpanded ${...} placeholders, and FML rejected
+      # it ("is not a valid mod file"). Validate the *packaged* metadata and the
+      # bundled :core classes, not just the compile.
+      - name: Validate packaged mod jar
+        run: |
+          jar_path=$(find mod/build/libs -maxdepth 1 -name '*.jar' ! -name '*-sources.jar' | head -n1)
+          echo "Validating $jar_path"
+          unzip -p "$jar_path" META-INF/neoforge.mods.toml > /tmp/jar-mods.toml
+          if grep -q '\${' /tmp/jar-mods.toml; then
+            echo '::error::neoforge.mods.toml in the jar still contains unexpanded ${...} placeholders'
+            cat /tmp/jar-mods.toml
+            exit 1
+          fi
+          python3 - <<'EOF'
+          import tomllib
+          with open('/tmp/jar-mods.toml', 'rb') as f:
+              data = tomllib.load(f)
+          mod = data['mods'][0]
+          assert mod['modId'] == 'pcmc_territory', mod
+          deps = {d['modId'] for d in data['dependencies'][mod['modId']]}
+          assert {'neoforge', 'minecraft', 'minecolonies', 'openpartiesandclaims'} <= deps, deps
+          print('mods.toml OK:', mod['modId'], mod['version'], '| deps:', sorted(deps))
+          EOF
+          unzip -l "$jar_path" | grep -q 'com/theasshats/pcmcterritory/core/RealmsRegistry.class' \
+            || { echo '::error::bundled :core classes missing from the mod jar'; exit 1; }
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4

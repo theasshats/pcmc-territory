@@ -32,6 +32,18 @@ maintainer box with full internet).
 have **not** been run successfully here — `.github/workflows/build.yml` runs them with
 full CI network access, and that result is the first real compile signal.
 
+**Lesson from the first playtest — a compiling jar can still be unloadable.** The
+spike scaffold omitted the MDK's resource-expansion step, so the built jar's
+`neoforge.mods.toml` still contained literal `${...}` placeholders. FML rejected it
+(`Error during pre-loading phase: File mods\pcmc_territory.jar is not a valid mod
+file`) and the client then died in an unrelated-looking Quark
+`Where is minecraft???!` render-init crash — the usual mask when any mod fails
+pre-loading (first error in `latest.log` is the real one). Fixed by expanding the
+metadata in `:mod`'s `processResources`; `build.yml` now validates the **packaged**
+jar (placeholder grep, TOML parse, modId + dependency assertions, bundled `:core`
+classes present), so "compiles but won't load" packaging failures turn CI red
+instead of surfacing on a playtester's machine.
+
 ## 2. MineColonies API (compile-verified)
 
 `mod/src/main/java/com/theasshats/pcmcterritory/integration/minecolonies/MineColoniesColonyLookup.java`
