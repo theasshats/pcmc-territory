@@ -1,12 +1,12 @@
 package com.theasshats.pcmcterritory.core;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.LongSupplier;
 
 /**
@@ -34,6 +34,12 @@ import java.util.function.LongSupplier;
  *
  * <p>Negative results ("wilderness") are cached too, subject to the same TTL, so
  * repeated lookups over ungoverned land don't repeatedly call into MineColonies/OPAC.
+ *
+ * <p><b>Threading.</b> Not thread-safe. Every call — {@link #resolveLeaf}/{@link
+ * #resolveChain}, the {@code set*Lookup} re-points, and {@link RegistryListener}
+ * invalidation — must run on the server thread, which is the only thread on which the
+ * backing {@link RealmsRegistry} and the MineColonies/OPAC lookups may be touched. A
+ * lock-free variant allowing off-thread reads is tracked as a follow-up.
  */
 public final class TerritoryResolver implements RegistryListener {
 
@@ -44,11 +50,11 @@ public final class TerritoryResolver implements RegistryListener {
     private record CacheEntry(UUID entityOrSentinel, long cachedAtTick) {}
 
     private final RealmsRegistry registry;
-    private volatile ColonyLookup colonyLookup;
-    private volatile ClaimLookup claimLookup;
+    private ColonyLookup colonyLookup;
+    private ClaimLookup claimLookup;
     private final LongSupplier currentTick;
     private final long ttlTicks;
-    private final ConcurrentMap<TerritoryChunk, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Map<TerritoryChunk, CacheEntry> cache = new HashMap<>();
 
     public TerritoryResolver(RealmsRegistry registry, ColonyLookup colonyLookup, ClaimLookup claimLookup) {
         this(registry, colonyLookup, claimLookup, () -> 0L, DEFAULT_TTL_TICKS);
