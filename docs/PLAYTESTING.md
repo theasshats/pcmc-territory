@@ -71,9 +71,10 @@ Run in order; later scenarios reuse the realm created in scenario 2.
 ### Scenario 3 — OPAC path (`/realm debug bindclaim`)
 
 1. Travel well outside the colony border. Claim the chunk you're standing in
-   with OPAC — via the Xaero's map claims screen if a Xaero map mod is
-   installed, or OPAC's claim commands (start from `/openpac-claims` tab
-   completion; the exact subcommand layout varies by version).
+   with OPAC. Easiest without a map mod: press **`'`** (apostrophe) to open
+   OPAC's claims screen and claim the current chunk from the grid (the key is
+   rebindable under Controls). Alternatives: the Xaero's map claims screen if a
+   Xaero map mod is installed, or `/openpac-claims` + tab-completion.
 2. `/realm whogoverns` → still **ungoverned** (a raw OPAC claim with no realm
    binding is not territory).
 3. As an op: `/realm debug bindclaim "Riverside"` → `Bound claim owner <uuid>
@@ -82,6 +83,22 @@ Run in order; later scenarios reuse the realm created in scenario 2.
    lists the claim owner UUID under Claims.
 5. Walk into an **adjacent unclaimed** chunk: ungoverned. Back into the claimed
    chunk: governed — confirms resolution is per-chunk, not radius-based.
+
+### Scenario 3b — colony borders shield an overlapping claim *(new in PR #1; optional, needs a second colony)*
+
+Validates the precedence rule added in this PR: a colony's border always wins over
+an OPAC claim, and an *unfounded* colony resolves as ungoverned rather than falling
+through to a claim that overlaps it.
+
+1. Place a **second** colony (Supply Camp → Town Hall → Create Colony) but **do
+   not** `/realm found` it — leave it unfounded.
+2. Inside that second colony's border, OPAC-claim the chunk you're standing in,
+   then as op `/realm debug bindclaim "Riverside"` to bind that claim to the realm
+   from scenario 2.
+3. `/realm whogoverns` there → must report **ungoverned**. Pre-PR behavior would
+   have fallen through to the bound claim and reported **'Riverside'** — if you see
+   that, the shield logic in `TerritoryResolver.resolveLeaf` regressed (it must
+   consult OPAC only for chunks outside every colony).
 
 ### Scenario 4 — wilderness and the TTL
 
