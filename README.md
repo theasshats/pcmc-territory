@@ -64,6 +64,18 @@ they aren't lost before that work is scoped:
 Either or both can be missing without the mod crashing — territory resolution simply
 degrades to "no colonies/claims known," and chunks resolve as ungoverned.
 
+## Known limitation: sub-level (airship) claims
+
+Territory resolution is **chunk-based** — it answers "who governs this `(level,
+chunkPos)`?". A claim bound to a Valkyrien Skies **sub-level**, such as an
+[`aeroclaims`](https://modrinth.com/mod/CwZ8q37q) airship claim, is *not* a chunk in
+the parent level, so a player standing on a claimed airship resolves by the **ground
+chunk beneath the ship** (often ungoverned wilderness) rather than by the ship's own
+claim. This is **by design in Part 1, not a bug** — the resolver has no sub-level
+source yet. Adding one, and deciding the precedence rule when a claimed ship sits over
+another faction's territory, is tracked in issues #4 and #5 (see `docs/SPIKE-PART1.md`
+§7); until then, ship-borne territory resolves to the ground beneath it.
+
 ## Commands
 
 - `/realm found <name>` — binds the colony at your current position to a political
