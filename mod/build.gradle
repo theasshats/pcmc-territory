@@ -1,0 +1,114 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.78'
+}
+
+base {
+    archivesName = project.mod_id
+}
+
+version = project.mod_version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(java_version)
+    }
+}
+
+repositories {
+    mavenCentral()
+    // MineColonies (CurseForge mirror via CurseMaven — see docs/SPIKE-PART1.md)
+    maven {
+        url = 'https://www.cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+    // Open Parties and Claims (Modrinth maven — see docs/SPIKE-PART1.md)
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
+}
+
+neoForge {
+    version = project.neo_version
+
+    // Generates run configurations for local testing (not usable in this sandbox —
+    // see docs/SPIKE-PART1.md). Kept minimal: client/server/data with this mod loaded.
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+        data {
+            data()
+            programArguments.addAll(
+                    '--mod', project.mod_id,
+                    '--all',
+                    '--output', file('src/generated/resources').getAbsolutePath(),
+                    '--existing', file('src/main/resources').getAbsolutePath()
+            )
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    implementation project(':core')
+
+    // --- Soft dependencies (compile-time only) ---
+    // MineColonies 1.1.1327-1.21.1-snapshot, CurseForge project 245506 / file 8186694.
+    compileOnly "curse.maven:minecolonies-${minecolonies_curse_project}:${minecolonies_curse_file}"
+
+    // Open Parties and Claims neoforge-1.21.1-0.26.2, Modrinth project gF3BGWvG,
+    // resolved by version id (see gradle.properties — the version-number form differs
+    // from the jar-suffix form that failed CI).
+    compileOnly "maven.modrinth:open-parties-and-claims:${opac_modrinth_version}"
+}
+
+// :core is a plain Java library bundled into the mod jar so RealmsSavedData etc.
+// can use it at runtime without requiring server operators to install it separately.
+jar {
+    from(project(':core').sourceSets.main.output)
+}
+
+// neoforge.mods.toml in src/main/resources is a template: FML rejects a jar whose
+// metadata still contains literal ${...} placeholders ("is not a valid mod file",
+// which then cascades into an unrelated-looking Quark render-init crash). The spike
+// scaffold omitted this expansion and green CI didn't catch it — the first playtest
+// did. CI now validates the packaged mods.toml (see .github/workflows/build.yml).
+var metadataProperties = [
+        loader_version_range      : loader_version_range,
+        mod_license               : mod_license,
+        mod_id                    : mod_id,
+        mod_version               : mod_version,
+        mod_name                  : mod_name,
+        mod_authors               : mod_authors,
+        mod_description           : mod_description,
+        neo_version_range         : neo_version_range,
+        minecraft_version_range   : minecraft_version_range,
+        minecolonies_version_range: minecolonies_version_range,
+        opac_mod_id               : opac_mod_id,
+        opac_version_range        : opac_version_range,
+]
+
+tasks.named('processResources', ProcessResources).configure {
+    inputs.properties metadataProperties
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand metadataProperties
+    }
+}
+
+tasks.named('compileJava').configure {
+    dependsOn ':core:classes'
+}

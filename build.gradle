@@ -1,0 +1,15 @@
+// Root project — intentionally thin. Each subproject configures its own toolchain/plugins:
+//
+//   :core — pure Java engine (entity registry, chunk->entity resolver, cache/invalidation).
+//           No Minecraft/NeoForge/MineColonies/OPAC dependencies, so it builds and tests
+//           without network access to the modding maven repos. This is what `./gradlew test`
+//           exercises in environments that can't reach maven.neoforged.net etc.
+//
+//   :mod  — the NeoForge mod (pcmc_territory). Applies ModDevGradle, depends on :core,
+//           and wires the engine to real Minecraft types, NBT persistence, MineColonies,
+//           and Open Parties and Claims. Requires the NeoForge/CurseMaven/Modrinth maven
+//           repos to resolve — see docs/SPIKE-PART1.md for sandbox network notes.
+//
+// Running `./gradlew build` from the root runs the `build` task in both subprojects
+// (Gradle's default multi-project task matching) — :core succeeds offline, :mod needs
+// the modding repos above.
