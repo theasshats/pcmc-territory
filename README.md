@@ -26,8 +26,10 @@ they aren't lost before that work is scoped:
   colony resolves to the realm that bound it — colony borders take strict precedence
   and shield their chunks from outside claims. So a city's MineColonies border plus
   any OPAC claims its members bind to it already resolve as one combined territory
-  today — Part 1 is missing only a player-facing bind command (`/realm debug
-  bindclaim` is the op + OFFICER-only stand-in for exercising that path).
+  today. A realm member's OPAC claims now **auto-bind** to their realm on creation
+  (see "Automatic claim binding"), so members' claims join their territory with no
+  manual step; the op + OFFICER-only `/realm debug bindclaim` remains for binding a
+  claim by hand and for the ambiguous cases auto-binding deliberately skips.
 - **Tier-gated claim allowances.** Citizens start with a small OPAC claim allowance;
   MineColonies city-tier growth raises it; confederation/faction leaders hold a
   larger pool they can grant to members as "charters" (e.g. to start an outpost or
@@ -86,9 +88,23 @@ another faction's territory, is tracked in issues #4 and #5 (see `docs/SPIKE-PAR
 - `/realm whogoverns` — debug command reporting which entity (if any) governs your
   current chunk.
 - `/realm debug bindclaim <name>` — **op + OFFICER-only** playtest helper: binds the OPAC claim
-  covering your current chunk to the named entity. Part 1 has no player-facing claim
-  binding (that arrives with Part 2); this exists so the OPAC resolution path can be
-  exercised in-game at all.
+  covering your current chunk to the named entity by hand. Most member claims now bind
+  automatically (below); this remains for binding to a named realm explicitly and for
+  the cases auto-binding skips.
+
+Every `<name>` argument above tab-completes to existing realm names.
+
+## Automatic claim binding
+
+When Open Parties and Claims is present, a realm member's land claims **bind to their
+realm automatically**. The first time a member claims a chunk, their claim owner is
+bound to the realm they belong to, so that chunk — and all their future claims —
+resolves to their realm. To stay unambiguous this only happens when the player is a
+member of **exactly one** realm and isn't already bound; if they belong to no realm, to
+several, or their claims are already bound elsewhere, nothing changes and `/realm debug
+bindclaim` is the manual path. The claiming player gets a one-time chat confirmation.
+Binding is keyed on the claim **owner**, so unclaiming a chunk does not unbind the owner
+— their remaining claims still resolve to the realm.
 
 ## Building
 

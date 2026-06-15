@@ -114,6 +114,22 @@ public final class RealmsRegistry {
     }
 
     /**
+     * Returns every entity {@code playerId} is a member of, in registry (creation)
+     * order. Part 1 has no member-management beyond founding, so in practice this is
+     * the realm(s) the player founded — usually empty or a single element. Used by
+     * the OPAC claim auto-binder to decide which realm a member's new claim joins.
+     */
+    public List<RealmEntity> entitiesForMember(UUID playerId) {
+        List<RealmEntity> result = new ArrayList<>();
+        for (RealmEntity entity : entities.values()) {
+            if (entity.members().containsKey(playerId)) {
+                result.add(entity);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Binds a MineColonies colony to an entity. Throws {@link RealmConflictException}
      * if the colony is already bound to a different entity.
      */

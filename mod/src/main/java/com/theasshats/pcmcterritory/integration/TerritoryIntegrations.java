@@ -3,6 +3,7 @@ package com.theasshats.pcmcterritory.integration;
 import com.theasshats.pcmcterritory.core.ClaimLookup;
 import com.theasshats.pcmcterritory.core.ColonyLookup;
 import com.theasshats.pcmcterritory.integration.minecolonies.MineColoniesColonyLookup;
+import com.theasshats.pcmcterritory.integration.opac.OpacClaimAutoBinder;
 import com.theasshats.pcmcterritory.integration.opac.OpacClaimLookup;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.ModList;
@@ -39,5 +40,17 @@ public final class TerritoryIntegrations {
 
     public static ClaimLookup createClaimLookup(MinecraftServer server) {
         return opacPresent() ? new OpacClaimLookup(server) : ClaimLookup.NOOP;
+    }
+
+    /**
+     * Registers the OPAC claim auto-binder (issue #7) so a realm member's new claims
+     * bind to their realm automatically. No-op when OPAC is absent — and because the
+     * call is gated here, {@link OpacClaimAutoBinder} (which names OPAC API types) is
+     * only class-loaded when OPAC is present.
+     */
+    public static void registerClaimAutoBinder(MinecraftServer server) {
+        if (opacPresent()) {
+            OpacClaimAutoBinder.register(server);
+        }
     }
 }
