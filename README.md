@@ -139,6 +139,10 @@ this sandbox cannot launch Minecraft, so all of the below needs a real client/se
 - [ ] `/realm whogoverns` reports the correct entity while standing inside an Open
       Parties and Claims claim bound via `/realm debug bindclaim` (no MineColonies
       colony there).
+- [ ] As a member of exactly one realm, OPAC-claiming a chunk auto-binds your claims to
+      that realm (issue #7): you get the one-time "your land claims now belong to…"
+      message and `/realm whogoverns` then reports your realm there. A claim by a
+      non-member (or by someone in several realms) does **not** auto-bind.
 - [ ] `/realm whogoverns` reports "ungoverned" in wilderness (no colony, no claim).
 - [ ] Unclaiming the OPAC chunk flips `/realm whogoverns` to "ungoverned" within
       ~1–2 seconds, with no restart (the resolver's TTL picking up the external
@@ -146,7 +150,10 @@ this sandbox cannot launch Minecraft, so all of the below needs a real client/se
 - [ ] Entities, members, and bindings survive a save-and-quit / server restart
       (SavedData round-trip).
 - [ ] `/realm info [name]` prints sensible header/members/colonies/claims for a bound
-      entity.
+      entity, with members and claim owners shown as **usernames** rather than UUIDs
+      when the server has seen those players (issue #6).
+- [ ] Pressing **tab** after `/realm info `, `/realm found `, or `/realm debug bindclaim `
+      suggests existing realm names (issue #8).
 - [ ] No measurable TPS impact from repeated `/realm whogoverns` calls or normal block
       break / combat in governed and ungoverned chunks (spark profile before/after).
 - [ ] Removing MineColonies (keeping OPAC) — server starts without crashing, colony

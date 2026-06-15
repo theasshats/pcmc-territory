@@ -49,9 +49,11 @@ Run in order; later scenarios reuse the realm created in scenario 2.
 
 1. Launch the client with the full mod set. It must reach the main menu.
 2. Create a fresh world (default settings). It must load without errors.
-3. Check the log for the two wiring lines:
-   `[pcmc_territory] MineColonies found - colony resolution enabled` and
-   `[pcmc_territory] Open Parties and Claims found - claim resolution enabled`.
+3. Check the log for the wiring lines:
+   `[pcmc_territory] MineColonies found - colony resolution enabled`,
+   `[pcmc_territory] Open Parties and Claims found - claim resolution enabled`, and —
+   once the world finishes loading (it's logged at server-started, not server-starting) —
+   `[pcmc_territory] OPAC claim auto-binding enabled - …`.
 
 ### Scenario 2 — colony path (`/realm found`)
 
@@ -99,6 +101,27 @@ through to a claim that overlaps it.
    have fallen through to the bound claim and reported **'Riverside'** — if you see
    that, the shield logic in `TerritoryResolver.resolveLeaf` regressed (it must
    consult OPAC only for chunks outside every colony).
+
+### Scenario 3c — auto-bind a member's claim *(new in this PR; issue #7)*
+
+Validates that a realm member's OPAC claims bind to their realm with no manual command.
+
+1. As the LEADER of `Riverside` (the founder from scenario 2), and a member of **no
+   other** realm, travel outside every colony border and OPAC-claim a fresh chunk.
+2. Immediately — no command, no restart — expect the chat message
+   *"Your land claims now belong to realm 'Riverside'."* (the one-time confirmation).
+3. `/realm whogoverns` there → governed by `Riverside`. `/realm info "Riverside"` lists
+   your username under Claims.
+4. Claim a **second** chunk elsewhere: `/realm whogoverns` there is `Riverside` too,
+   with **no** second confirmation — binding is keyed on the claim owner, so it covers
+   all of your claims at once.
+5. Unclaim the first chunk: after ~1–2 s it flips to ungoverned (TTL), but `/realm info`
+   still lists you under Claims and your other claim stays governed — unclaiming a chunk
+   does not unbind the owner.
+6. Negative: have a second player who is in **no** realm (or an alt) OPAC-claim a chunk →
+   it stays ungoverned and they get no message. Auto-bind only acts for a member of
+   exactly one realm; the op-only `/realm debug bindclaim` remains the path for everyone
+   else.
 
 ### Scenario 4 — wilderness and the TTL
 
