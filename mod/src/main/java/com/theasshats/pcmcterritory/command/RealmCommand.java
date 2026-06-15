@@ -1,8 +1,12 @@
 package com.theasshats.pcmcterritory.command;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.theasshats.pcmcterritory.api.EntitySnapshot;
 import com.theasshats.pcmcterritory.api.TerritoryApi;
 import com.theasshats.pcmcterritory.core.ClaimKey;
@@ -14,13 +18,17 @@ import com.theasshats.pcmcterritory.integration.TerritoryIntegrations;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.GameProfileCache;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -36,10 +44,12 @@ public final class RealmCommand {
         dispatcher.register(Commands.literal("realm")
                 .then(Commands.literal("found")
                         .then(Commands.argument("name", StringArgumentType.string())
+                                .suggests(RealmCommand::suggestRealmNames)
                                 .executes(ctx -> found(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
                 .then(Commands.literal("info")
                         .executes(ctx -> info(ctx.getSource(), null))
                         .then(Commands.argument("name", StringArgumentType.string())
+                                .suggests(RealmCommand::suggestRealmNames)
                                 .executes(ctx -> info(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
                 .then(Commands.literal("whogoverns")
                         .executes(ctx -> whoGoverns(ctx.getSource())))
@@ -47,6 +57,7 @@ public final class RealmCommand {
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("bindclaim")
                                 .then(Commands.argument("name", StringArgumentType.string())
+                                        .suggests(RealmCommand::suggestRealmNames)
                                         .executes(ctx -> bindClaim(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "name")))))));
     }
@@ -141,11 +152,12 @@ public final class RealmCommand {
     }
 
     private static void sendInfo(CommandSourceStack source, EntitySnapshot entity) {
+        MinecraftServer server = source.getServer();
         source.sendSuccess(() -> Component.translatable(
                 "commands.pcmc_territory.info.header", entity.name(), entity.id().toString()), false);
 
         String members = entity.members().entrySet().stream()
-                .map(e -> e.getKey() + " (" + e.getValue() + ")")
+                .map(e -> nameFor(server, e.getKey()) + " (" + e.getValue() + ")")
                 .collect(Collectors.joining(", "));
         source.sendSuccess(() -> Component.translatable(
                 "commands.pcmc_territory.info.members", members.isEmpty() ? "-" : members), false);
@@ -158,10 +170,28 @@ public final class RealmCommand {
 
         String claims = entity.claimKeys().stream()
                 .map(ClaimKey::ownerId)
-                .map(UUID::toString)
+                .map(id -> nameFor(server, id))
                 .collect(Collectors.joining(", "));
         source.sendSuccess(() -> Component.translatable(
                 "commands.pcmc_territory.info.claims", claims.isEmpty() ? "-" : claims), false);
+    }
+
+    /**
+     * Resolves a player UUID to its last-seen username via the server's profile
+     * cache, falling back to the raw UUID when no name is cached — e.g. a member
+     * who has never logged in on this server, or an OPAC claim owner that is a
+     * server/party id rather than a real player. Never blocks on Mojang's API: the
+     * UUID-keyed cache lookup is local-only.
+     */
+    private static String nameFor(MinecraftServer server, UUID id) {
+        GameProfileCache cache = server.getProfileCache();
+        if (cache != null) {
+            String name = cache.get(id).map(GameProfile::getName).orElse(null);
+            if (name != null && !name.isEmpty()) {
+                return name;
+            }
+        }
+        return id.toString();
     }
 
     private static int whoGoverns(CommandSourceStack source) throws CommandSyntaxException {
@@ -253,5 +283,29 @@ public final class RealmCommand {
     /** Looks up an entity's display name, falling back to {@code "?"} if it no longer exists. */
     private static String entityName(RealmsSavedData data, UUID id) {
         return data.registry().get(id).map(RealmEntity::name).orElse("?");
+    }
+
+    /**
+     * Tab-completion for the {@code <name>} arguments of {@code /realm found},
+     * {@code /realm info}, and {@code /realm debug bindclaim}: suggests every
+     * existing realm whose name matches what the player has typed so far, quoting
+     * names that need it.
+     *
+     * <p>The registry is documented server-thread-only (see {@code TerritoryResolver}
+     * and issue #3) while command suggestions can be computed off the main thread, so
+     * the lookup is marshalled onto the server thread via {@link MinecraftServer#submit}.
+     */
+    private static CompletableFuture<Suggestions> suggestRealmNames(
+            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+        MinecraftServer server = ctx.getSource().getServer();
+        return server.submit(() -> {
+            String remaining = builder.getRemainingLowerCase();
+            for (RealmEntity entity : RealmsSavedData.get(server.overworld()).registry().all()) {
+                if (entity.name().toLowerCase(Locale.ROOT).startsWith(remaining)) {
+                    builder.suggest(StringArgumentType.escapeIfRequired(entity.name()));
+                }
+            }
+            return builder.build();
+        });
     }
 }

@@ -111,8 +111,17 @@ If a future OPAC version moves these types, `OpacClaimLookup` is the one file to
 `ClaimLookup` and its callers are unaffected. Runtime behavior (does a claimed chunk
 actually resolve?) still needs the docs/PLAYTESTING.md pass.
 
-**Also unverified**: OPAC's claim-change event/listener API. Part 1 does not depend on
-it; see §4.
+**Claim-change listener (verified, now used by issue #7):** OPAC has *no* per-claim
+NeoForge event, but it does expose a public listener. `IClaimsManagerListenerAPI`
+(package `xaero.pac.common.claims.tracker.api`) is registered via
+`OpenPACServerAPI.get(server).getServerClaimsManager().getTracker().register(listener)`;
+its `onChunkChange(ResourceLocation dim, int x, int z, IPlayerChunkClaimAPI claim)`
+fires **synchronously on the server thread** for every claim/unclaim (a `null` claim
+means unclaim), and `claim.getPlayerId()` is the new owner. Registration is add-only
+(no `unregister`), and claims restored from disk at startup don't re-fire it — so
+`OpacClaimAutoBinder` registers once at `ServerStartedEvent` (after OPAC's manager has
+loaded). Cross-checked against the OPAC 1.21 branch source; in-game behavior still
+needs the docs/PLAYTESTING.md pass.
 
 **For a future Part 2 spike**: whether OPAC exposes (a) a settable per-player claim
 limit, or (b) a cancellable claim-creation event. Either would let a future
@@ -146,10 +155,12 @@ This is **strictly more robust** than a hand-guessed event hook: it works identi
 regardless of whether/how MineColonies or OPAC signal claim changes, degrades to "1
 second of staleness" in the worst case, and the existing TTL-expiry test
 (`TerritoryResolverTest#cacheEntryExpiresAfterTtlAndPicksUpExternalClaimChange`)
-demonstrates the recompute-on-expiry behavior with a fake clock. If a maintainer later
-confirms a real change-event API exists, it can be added as a **third**, immediate
-trigger (call `invalidate(chunk)` from the event handler) without removing the TTL
-fallback — the TTL is the floor, not a replacement for a faster signal.
+demonstrates the recompute-on-expiry behavior with a fake clock. OPAC's claim-change
+listener has since been confirmed (§3, used by issue #7's auto-binder); wiring it as a
+**third**, immediate invalidation trigger (call `invalidate(chunk)` from `onChunkChange`)
+is now an available enhancement but is intentionally **not** done yet — the auto-binder
+reacts to claims, while resolution still rides the TTL floor. Adding it later would not
+remove the TTL fallback — the TTL is the floor, not a replacement for a faster signal.
 
 Negative results ("wilderness", no colony/claim) are cached and TTL'd identically, so
 repeated lookups over ungoverned land don't repeatedly call into MineColonies/OPAC.
@@ -179,3 +190,33 @@ should flag any divergence worth aligning.
   `/realm whogoverns` answer correctly inside a real OPAC claim? what's the actual TPS
   cost?) is on the maintainer playtest checklist in `README.md` — green CI is not
   in-game verification.
+
+## 7. Sub-level (airship) claims — not spiked
+
+`aeroclaims` (Modrinth `CwZ8q37q`) binds claims to Valkyrien Skies **sub-levels**
+(ships), not to chunks in the parent level. The resolver (`TerritoryApi.resolve(level,
+chunkPos)` / `TerritoryResolver`) is **chunk-based**, so a player standing on a claimed
+airship resolves by the **ground chunk beneath the ship** — ungoverned wilderness, or
+whatever colony/claim covers that ground — never by the ship's own claim. This is a
+**documented limitation, not a bug** (also called out in `README.md`).
+
+The same network sandbox that blocks the MineColonies/OPAC jars (§1) also blocks the
+`aeroclaims` and Valkyrien Skies jars, so their APIs could **not** be spiked here. Two
+things stay unconfirmed: whether `aeroclaims` exposes a sub-level's owning party/owner
+through a public API, and how to obtain the sub-level an entity is currently riding.
+Per the spike discipline ("compile a real call before building on it"), **no
+integration code was written against a guessed API** — that is the maintainer spike
+issue #4 asks for, and it needs a box that can resolve the jars.
+
+Tracking:
+
+- **#4** — add an entity→sub-level→owning-party resolution source, layered on top of
+  the existing chunk resolution and kept a **soft dep** (no `aeroclaims` ⇒ it no-ops
+  and resolution falls back to the ground chunk).
+- **#5** — the precedence rule for a claimed ship over another faction's territory
+  ("embassy"/extraterritoriality), plus the open question of whether the same rule
+  extends to OPAC chunk enclaves (which Part 1 currently shields behind colony
+  borders — README "Looking ahead").
+
+Both are **out of Part 1 scope** and not blocking the Part 2 MVP — the chunk-only
+fallback above is the intended interim behavior, not a regression.

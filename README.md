@@ -26,8 +26,10 @@ they aren't lost before that work is scoped:
   colony resolves to the realm that bound it — colony borders take strict precedence
   and shield their chunks from outside claims. So a city's MineColonies border plus
   any OPAC claims its members bind to it already resolve as one combined territory
-  today — Part 1 is missing only a player-facing bind command (`/realm debug
-  bindclaim` is the op + OFFICER-only stand-in for exercising that path).
+  today. A realm member's OPAC claims now **auto-bind** to their realm on creation
+  (see "Automatic claim binding"), so members' claims join their territory with no
+  manual step; the op + OFFICER-only `/realm debug bindclaim` remains for binding a
+  claim by hand and for the ambiguous cases auto-binding deliberately skips.
 - **Tier-gated claim allowances.** Citizens start with a small OPAC claim allowance;
   MineColonies city-tier growth raises it; confederation/faction leaders hold a
   larger pool they can grant to members as "charters" (e.g. to start an outpost or
@@ -64,6 +66,18 @@ they aren't lost before that work is scoped:
 Either or both can be missing without the mod crashing — territory resolution simply
 degrades to "no colonies/claims known," and chunks resolve as ungoverned.
 
+## Known limitation: sub-level (airship) claims
+
+Territory resolution is **chunk-based** — it answers "who governs this `(level,
+chunkPos)`?". A claim bound to a Valkyrien Skies **sub-level**, such as an
+[`aeroclaims`](https://modrinth.com/mod/CwZ8q37q) airship claim, is *not* a chunk in
+the parent level, so a player standing on a claimed airship resolves by the **ground
+chunk beneath the ship** (often ungoverned wilderness) rather than by the ship's own
+claim. This is **by design in Part 1, not a bug** — the resolver has no sub-level
+source yet. Adding one, and deciding the precedence rule when a claimed ship sits over
+another faction's territory, is tracked in issues #4 and #5 (see `docs/SPIKE-PART1.md`
+§7); until then, ship-borne territory resolves to the ground beneath it.
+
 ## Commands
 
 - `/realm found <name>` — binds the colony at your current position to a political
@@ -74,9 +88,23 @@ degrades to "no colonies/claims known," and chunks resolve as ungoverned.
 - `/realm whogoverns` — debug command reporting which entity (if any) governs your
   current chunk.
 - `/realm debug bindclaim <name>` — **op + OFFICER-only** playtest helper: binds the OPAC claim
-  covering your current chunk to the named entity. Part 1 has no player-facing claim
-  binding (that arrives with Part 2); this exists so the OPAC resolution path can be
-  exercised in-game at all.
+  covering your current chunk to the named entity by hand. Most member claims now bind
+  automatically (below); this remains for binding to a named realm explicitly and for
+  the cases auto-binding skips.
+
+Every `<name>` argument above tab-completes to existing realm names.
+
+## Automatic claim binding
+
+When Open Parties and Claims is present, a realm member's land claims **bind to their
+realm automatically**. The first time a member claims a chunk, their claim owner is
+bound to the realm they belong to, so that chunk — and all their future claims —
+resolves to their realm. To stay unambiguous this only happens when the player is a
+member of **exactly one** realm and isn't already bound; if they belong to no realm, to
+several, or their claims are already bound elsewhere, nothing changes and `/realm debug
+bindclaim` is the manual path. The claiming player gets a one-time chat confirmation.
+Binding is keyed on the claim **owner**, so unclaiming a chunk does not unbind the owner
+— their remaining claims still resolve to the realm.
 
 ## Building
 
@@ -111,6 +139,10 @@ this sandbox cannot launch Minecraft, so all of the below needs a real client/se
 - [ ] `/realm whogoverns` reports the correct entity while standing inside an Open
       Parties and Claims claim bound via `/realm debug bindclaim` (no MineColonies
       colony there).
+- [ ] As a member of exactly one realm, OPAC-claiming a chunk auto-binds your claims to
+      that realm (issue #7): you get the one-time "your land claims now belong to…"
+      message and `/realm whogoverns` then reports your realm there. A claim by a
+      non-member (or by someone in several realms) does **not** auto-bind.
 - [ ] `/realm whogoverns` reports "ungoverned" in wilderness (no colony, no claim).
 - [ ] Unclaiming the OPAC chunk flips `/realm whogoverns` to "ungoverned" within
       ~1–2 seconds, with no restart (the resolver's TTL picking up the external
@@ -118,7 +150,10 @@ this sandbox cannot launch Minecraft, so all of the below needs a real client/se
 - [ ] Entities, members, and bindings survive a save-and-quit / server restart
       (SavedData round-trip).
 - [ ] `/realm info [name]` prints sensible header/members/colonies/claims for a bound
-      entity.
+      entity, with members and claim owners shown as **usernames** rather than UUIDs
+      when the server has seen those players (issue #6).
+- [ ] Pressing **tab** after `/realm info `, `/realm found `, or `/realm debug bindclaim `
+      suggests existing realm names (issue #8).
 - [ ] No measurable TPS impact from repeated `/realm whogoverns` calls or normal block
       break / combat in governed and ungoverned chunks (spark profile before/after).
 - [ ] Removing MineColonies (keeping OPAC) — server starts without crashing, colony

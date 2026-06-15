@@ -15,5 +15,6 @@
   "commands.pcmc_territory.debug.opac_absent": "Open Parties and Claims is not installed on this server; claim binding is unavailable.",
   "commands.pcmc_territory.debug.no_claim_here": "This chunk has no Open Parties and Claims claim.",
   "commands.pcmc_territory.debug.claim_already_bound": "This claim's owner is already bound to '%s'.",
-  "commands.pcmc_territory.debug.bindclaim.success": "Bound claim owner %s to realm '%s'."
+  "commands.pcmc_territory.debug.bindclaim.success": "Bound claim owner %s to realm '%s'.",
+  "commands.pcmc_territory.autobind.notify": "Your land claims now belong to realm '%s'."
 }

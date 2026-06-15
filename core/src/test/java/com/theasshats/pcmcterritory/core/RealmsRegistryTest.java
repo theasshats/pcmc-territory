@@ -155,6 +155,21 @@ class RealmsRegistryTest {
     }
 
     @Test
+    void entitiesForMemberReturnsRealmsThePlayerBelongsTo() {
+        RealmsRegistry registry = new RealmsRegistry();
+        UUID alice = UUID.randomUUID();
+        UUID bob = UUID.randomUUID();
+        RealmEntity avalon = registry.createEntity("Avalon", alice, 0L);
+        RealmEntity camelot = registry.createEntity("Camelot", bob, 0L);
+        registry.setMember(camelot.id(), alice, Role.CITIZEN);
+
+        // Alice founded Avalon and is a citizen of Camelot, in creation order.
+        assertEquals(List.of(avalon, camelot), registry.entitiesForMember(alice));
+        assertEquals(List.of(camelot), registry.entitiesForMember(bob));
+        assertTrue(registry.entitiesForMember(UUID.randomUUID()).isEmpty());
+    }
+
+    @Test
     void renameAndMemberManagement() {
         RealmsRegistry registry = new RealmsRegistry();
         UUID founder = UUID.randomUUID();
